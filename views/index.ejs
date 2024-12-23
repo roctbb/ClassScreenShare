@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Поделиться экраном</title>
+</head>
+<body>
+<h1>Введите фамилию и имя:</h1>
+<input type="text" id="name" placeholder="Ваше имя">
+<button id="startSharing">Делиться экраном</button>
+<p id="status"></p>
+
+<!-- Элемент для отображения обратной связи -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    const startSharing = document.getElementById('startSharing');
+    startSharing.addEventListener('click', async () => {
+        const name = document.getElementById('name').value;
+        if (!name) {
+            alert('Введите имя!');
+            return;
+        }
+
+        const status = document.getElementById('status');
+        try {
+            // Запрашиваем доступ к захвату экрана
+            const stream = await navigator.mediaDevices.getDisplayMedia();
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            status.textContent = 'Передача экрана началась!';
+
+            setInterval(() => {
+                // Захватываем кадры и уменьшаем их
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    const targetWidth = 640; // Целевое ширина изображений
+                    const scaleFactor = targetWidth / video.videoWidth; // Коэффициент уменьшения
+                    const targetHeight = video.videoHeight * scaleFactor; // Высота пропорционально уменьшенной ширине
+
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    // Преобразуем уменьшенное изображение в Data URL
+                    const imgData = canvas.toDataURL('image/webp', 0.7); // Уменьшаем также качество до 70%
+                    socket.emit('share_screen', { name, data: imgData });
+
+                }
+            }, 5000); // Отправляем каждые 500 мс
+        } catch (err) {
+            console.error(err);
+            alert('Не удалось получить доступ к экрану!');
+            status.textContent = 'Ошибка! Вы не дали разрешение.';
+        }
+    });
+</script>
+</body>
+</html>

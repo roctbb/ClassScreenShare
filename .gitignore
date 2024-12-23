@@ -1,0 +1,44 @@
+# Node.js модули
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# Файлы и директории среды разработки
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Операционная система
+Thumbs.db
+desktop.ini
+
+# Конфиденциальные данные
+.env
+
+# Тестовые покрытия
+coverage/
+
+# Кэш-файлы WebStorm (или других JetBrains IDE)
+.idea
+*.iml
+*.iws
+
+# Кэш Nginx (если локально храните)
+nginx_cache/
+
+# Сборки (например, если проект фронтенд-сборка):
+dist/
+build/
+
+# Docker
+docker-compose.override.yml
+.env.docker
+
+# Файлы архивов
+*.zip
+*.tar.gz
+*.rar

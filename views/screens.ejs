@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Экраны учеников</title>
+    <style>
+        /* Контейнер верхней информации */
+        #info {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        #info h2 {
+            margin: 0 0 10px 0; /* Убираем отступы вокруг заголовка */
+            font-size: 18px;
+        }
+
+        #info ul {
+            padding-left: 20px; /* Чтобы отступы списка выглядели лучше */
+            margin: 0;
+        }
+
+        #info li {
+            font-size: 14px;
+            list-style: disc;
+        }
+
+        /* Контейнер сетки для всех студентов */
+        #screens {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Гибкая сетка */
+            gap: 10px; /* Расстояние между блоками */
+            padding: 10px;
+        }
+
+        /* Каждый блок ученика */
+        .student {
+            position: relative; /* Для абсолютного позиционирования имени */
+            overflow: hidden; /* Чтобы скрыть выступающие элементы */
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #000; /* Фон для экранов */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Имя ученика поверх изображения */
+        .student h3 {
+            position: absolute; /* Абсолютное позиционирование внутри блока */
+            top: 10px;
+            left: 10px;
+            margin: 0;
+            padding: 5px 10px;
+            background-color: rgba(0, 0, 0, 0.6); /* Полупрозрачный фон для текста */
+            color: #fff;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+
+        /* Видео или изображение экрана */
+        .student img {
+            width: 100%;
+            height: 100%; /* Заполнение всего блока */
+            object-fit: cover; /* Масштабируем с сохранением пропорций */
+        }
+    </style>
+</head>
+<body>
+
+<!-- Информация о количестве студентов и их список -->
+<div id="info">
+    <h2>Количество участников: <span id="participantCount">0</span></h2>
+    <ul id="participantList"></ul>
+</div>
+
+<!-- Контейнер для всех учеников -->
+<div id="screens"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    const screensDiv = document.getElementById('screens');
+    const participantCount = document.getElementById('participantCount');
+    const participantList = document.getElementById('participantList');
+
+    // При обновлении списка экранов
+    socket.on('update_screens', (screens) => {
+        // Очистить существующие данные
+        screensDiv.innerHTML = '';
+        participantList.innerHTML = '';
+
+        // Получить имена участников и отсортировать их по алфавиту
+        const sortedNames = Object.values(screens)
+            .map(screen => screen.name)
+            .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })); // Сортировка без учета регистра
+
+        // Обновить общее количество участников
+        participantCount.textContent = sortedNames.length;
+
+        // Добавить участников в список
+        sortedNames.forEach(name => {
+            const li = document.createElement('li');
+            li.textContent = name;
+            participantList.appendChild(li);
+        });
+
+        // Отобразить экраны учеников
+        for (const [id, { name, data }] of Object.entries(screens)) {
+            const studentDiv = document.createElement('div');
+            studentDiv.className = 'student';
+
+            studentDiv.innerHTML = `
+          <h3>${name}</h3>
+          <img src="${data}" alt="Экран ${name}">
+        `;
+
+            screensDiv.appendChild(studentDiv);
+        }
+    });
+</script>
+</body>
+</html>
