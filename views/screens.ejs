@@ -4,119 +4,268 @@
     <meta charset="UTF-8">
     <title>Экраны учеников</title>
     <style>
-        /* Контейнер верхней информации */
+        body {
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+        }
+
+        /* Основной контейнер */
+        #container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+        }
+
+        /* Левый блок с участниками */
         #info {
-            margin-bottom: 20px;
+            flex: 1;
+            margin-right: 20px;
             padding: 10px;
             background-color: #f1f1f1;
             border: 1px solid #ccc;
             border-radius: 5px;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
-
-        #info h2 {
-            margin: 0 0 10px 0; /* Убираем отступы вокруг заголовка */
-            font-size: 18px;
+        #info h2, #logs h2 {
+            margin-top: 0;
         }
-
-        #info ul {
-            padding-left: 20px; /* Чтобы отступы списка выглядели лучше */
+        #info ul, #logs ul {
+            padding-left: 20px;
             margin: 0;
-        }
-
-        #info li {
             font-size: 14px;
-            list-style: disc;
         }
-
-        /* Контейнер сетки для всех студентов */
+        /* Блок для журнала событий */
+        #logs {
+            flex: 1;
+            padding: 10px;
+            background-color: #eef9f1;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-width: 300px;
+            word-break: break-word;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        #logs ul {
+            list-style: none;
+            font-size: 14px;
+        }
+        #logs ul li {
+            margin-bottom: 5px;
+        }
+        #logs ul li span.action {
+            font-weight: bold;
+        }
+        #logs ul li span.timestamp {
+            font-style: italic;
+            color: gray;
+        }
+        /* Основной контейнер экранов */
         #screens {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Гибкая сетка */
-            gap: 10px; /* Расстояние между блоками */
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
             padding: 10px;
         }
 
-        /* Каждый блок ученика */
         .student {
-            position: relative; /* Для абсолютного позиционирования имени */
-            overflow: hidden; /* Чтобы скрыть выступающие элементы */
+            position: relative;
+            overflow: hidden;
             border: 1px solid #ccc;
             border-radius: 5px;
-            background-color: #000; /* Фон для экранов */
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #000;
         }
 
-        /* Имя ученика поверх изображения */
         .student h3 {
-            position: absolute; /* Абсолютное позиционирование внутри блока */
+            position: absolute;
             top: 10px;
             left: 10px;
             margin: 0;
             padding: 5px 10px;
-            background-color: rgba(0, 0, 0, 0.6); /* Полупрозрачный фон для текста */
-            color: #fff;
-            border-radius: 3px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
             font-size: 14px;
+            border-radius: 3px;
         }
 
-        /* Видео или изображение экрана */
         .student img {
             width: 100%;
-            height: 100%; /* Заполнение всего блока */
-            object-fit: cover; /* Масштабируем с сохранением пропорций */
+            height: 100%;
+            object-fit: cover;
+            cursor: zoom-in; /* Подсказка о возможности увеличения */
+        }
+
+        .warning {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(255, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 3px;
+            display: none;
+        }
+
+        .warning.active {
+            display: block;
+        }
+        #container {
+            margin: 5px;
+            padding: 5px;
+        }
+        #info, #logs {
+            padding: 5px;
+        }
+        h5 {
+            margin: 5px 0;
+        }
+        ul {
+            margin: 5px;
+            padding: 5px;
+        }
+        /* Полноэкранный режим */
+        .student.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            background-color: #000;
+        }
+
+        .student.fullscreen img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            cursor: zoom-out; /* Подсказка о выходе из режима */
         }
     </style>
 </head>
 <body>
-
-<!-- Информация о количестве студентов и их список -->
-<div id="info">
-    <h2>Количество участников: <span id="participantCount">0</span></h2>
-    <ul id="participantList"></ul>
+<div id="container">
+    <div id="info">
+        <h5>Количество участников: <span id="participantCount">0</span></h5>
+        <ul id="participantList"></ul>
+    </div>
+    <div id="logs">
+        <ul id="logList"></ul>
+    </div>
 </div>
-
-<!-- Контейнер для всех учеников -->
 <div id="screens"></div>
-
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
     const screensDiv = document.getElementById('screens');
     const participantCount = document.getElementById('participantCount');
     const participantList = document.getElementById('participantList');
+    const logList = document.getElementById('logList');
+    const warningTimeout = 5000; // Миллисекунд до показа предупреждения.
+    const students = {}; // Для отслеживания времени последнего обновления экрана.
+    let fullscreenStudentId = null; // ID текущего увеличенного экрана.
 
-    // При обновлении списка экранов
+    // Логирование события.
+    function logEvent(action, username) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('li');
+        logEntry.innerHTML = `<span class="action">${action}:</span> ${username} - <span class="timestamp">${timestamp}</span>`;
+        logList.prepend(logEntry); // Новые записи сверху.
+    }
+
+    // Проверка и обновление экранов.
     socket.on('update_screens', (screens) => {
-        // Очистить существующие данные
         screensDiv.innerHTML = '';
         participantList.innerHTML = '';
 
-        // Получить имена участников и отсортировать их по алфавиту
         const sortedNames = Object.values(screens)
             .map(screen => screen.name)
-            .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })); // Сортировка без учета регистра
+            .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
 
-        // Обновить общее количество участников
         participantCount.textContent = sortedNames.length;
 
-        // Добавить участников в список
         sortedNames.forEach(name => {
             const li = document.createElement('li');
             li.textContent = name;
             participantList.appendChild(li);
         });
 
-        // Отобразить экраны учеников
         for (const [id, { name, data }] of Object.entries(screens)) {
             const studentDiv = document.createElement('div');
             studentDiv.className = 'student';
 
+            // Если студента нет в списке, добавляем его с текущим временем.
+            if (!students[id]) {
+                students[id] = { lastUpdate: Date.now() };
+                logEvent('Подключился', name);
+            } else {
+                students[id].lastUpdate = Date.now();
+            }
+
+            // Восстановление полноэкранного состояния.
+            if (id === fullscreenStudentId) {
+                studentDiv.classList.add('fullscreen');
+            }
+
             studentDiv.innerHTML = `
-          <h3>${name}</h3>
-          <img src="${data}" alt="Экран ${name}">
-        `;
+                <h3>${name}</h3>
+                <img src="${data}" alt="Экран ${name}">
+                <div class="warning" id="warning-${id}">Экран не обновляется!</div>
+            `;
+
+            const img = studentDiv.querySelector('img');
+            img.addEventListener('click', () => toggleFullscreen(id, studentDiv, img));
 
             screensDiv.appendChild(studentDiv);
+        }
+
+        setInterval(() => {
+            Object.entries(students).forEach(([id, student]) => {
+                const warningDiv = document.getElementById(`warning-${id}`);
+                if (Date.now() - student.lastUpdate > warningTimeout) {
+                    warningDiv.classList.add('active');
+                } else {
+                    warningDiv.classList.remove('active');
+                }
+            });
+        }, 1000);
+    });
+
+    // Переключение полноэкранного режима.
+    function toggleFullscreen(id, studentDiv, img) {
+        if (studentDiv.classList.contains('fullscreen')) {
+            studentDiv.classList.remove('fullscreen');
+            fullscreenStudentId = null;
+        } else {
+            // Закрываем предыдущее полноэкранное изображение, если есть.
+            if (fullscreenStudentId !== null) {
+                const prevStudentDiv = document.querySelector('.student.fullscreen');
+                if (prevStudentDiv) {
+                    prevStudentDiv.classList.remove('fullscreen');
+                }
+            }
+            studentDiv.classList.add('fullscreen');
+            fullscreenStudentId = id;
+        }
+    }
+
+    socket.on('remove_student', (data) => {
+        const studentName = data.name || 'Неизвестный';
+        logEvent('Отключился', studentName);
+        delete students[data.id];
+
+        // Убираем полноэкранный режим, если отключился текущий увеличенный экран.
+        if (data.id === fullscreenStudentId) {
+            fullscreenStudentId = null;
         }
     });
 </script>

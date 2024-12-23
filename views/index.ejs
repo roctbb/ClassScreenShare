@@ -5,9 +5,11 @@
     <title>Поделиться экраном</title>
 </head>
 <body>
-<h1>Введите фамилию и имя:</h1>
-<input type="text" id="name" placeholder="Ваше имя">
-<button id="startSharing">Делиться экраном</button>
+<div id="login">
+    <h1>Введите фамилию и имя:</h1>
+    <input type="text" id="name" placeholder="Ваше имя">
+    <button id="startSharing">Делиться экраном</button>
+</div>
 <p id="status"></p>
 
 <!-- Элемент для отображения обратной связи -->
@@ -15,15 +17,22 @@
 <script>
     const socket = io();
     const startSharing = document.getElementById('startSharing');
+    const nameInput = document.getElementById('name');
+
     startSharing.addEventListener('click', async () => {
-        const name = document.getElementById('name').value;
+        const name = nameInput.value;
         if (!name) {
             alert('Введите имя!');
             return;
         }
 
+        socket.emit('join', {name: name});
+
         const status = document.getElementById('status');
         try {
+            // Прячем поле ввода и кнопку после начала трансляции
+            document.getElementById('login').style.display = 'none';
+
             // Запрашиваем доступ к захвату экрана
             const stream = await navigator.mediaDevices.getDisplayMedia();
             const video = document.createElement('video');
@@ -38,7 +47,7 @@
             setInterval(() => {
                 // Захватываем кадры и уменьшаем их
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    const targetWidth = 640; // Целевое ширина изображений
+                    const targetWidth = 1080; // Целевое ширина изображений
                     const scaleFactor = targetWidth / video.videoWidth; // Коэффициент уменьшения
                     const targetHeight = video.videoHeight * scaleFactor; // Высота пропорционально уменьшенной ширине
 
@@ -48,8 +57,8 @@
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                     // Преобразуем уменьшенное изображение в Data URL
-                    const imgData = canvas.toDataURL('image/webp', 0.7); // Уменьшаем также качество до 70%
-                    socket.emit('share_screen', { name, data: imgData });
+                    const imgData = canvas.toDataURL('image/webp', 0.8); // Уменьшаем также качество до 70%
+                    socket.emit('share_screen', imgData);
 
                 }
             }, 5000); // Отправляем каждые 500 мс
@@ -57,6 +66,8 @@
             console.error(err);
             alert('Не удалось получить доступ к экрану!');
             status.textContent = 'Ошибка! Вы не дали разрешение.';
+            // Возвращаем поле ввода и кнопку, если произошла ошибка
+            document.getElementById('login').style.display = '';
         }
     });
 </script>
