@@ -33,8 +33,15 @@
             // Прячем поле ввода и кнопку после начала трансляции
             document.getElementById('login').style.display = 'none';
 
+            const displayMediaOptions = {
+              video: {
+                displaySurface: "window",
+              },
+              audio: false,
+            };
+
             // Запрашиваем доступ к захвату экрана
-            const stream = await navigator.mediaDevices.getDisplayMedia();
+            const stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
             const video = document.createElement('video');
             video.srcObject = stream;
             video.play();
@@ -59,9 +66,8 @@
                     // Преобразуем уменьшенное изображение в Data URL
                     const imgData = canvas.toDataURL('image/webp', 0.8); // Уменьшаем также качество до 70%
                     socket.emit('share_screen', imgData);
-
                 }
-            }, 5000); // Отправляем каждые 500 мс
+            }, 5000);
         } catch (err) {
             console.error(err);
             alert('Не удалось получить доступ к экрану!');
