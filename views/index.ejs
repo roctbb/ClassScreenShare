@@ -25,6 +25,7 @@
     const startSharing = document.getElementById('startSharing');
     const nameInput = document.getElementById('name');
     const status = document.getElementById('status');
+    let has_connection = false;
 
     startSharing.addEventListener('click', async () => {
         const name = nameInput.value;
@@ -70,12 +71,14 @@
                     // Преобразуем уменьшенное изображение в Data URL
                     const imgData = canvas.toDataURL('image/webp', 0.8); // Уменьшаем также качество до 70%
                     try {
-                        socket.emit('share_screen', imgData);
-                        status.textContent = 'Передача экрана началась! Не закрывайте вкладку!';
+                        if (has_connection)
+                        {
+                            socket.emit('share_screen', imgData);
+                            status.textContent = 'Передача экрана началась! Не закрывайте вкладку!';
+                        }
                     }
                     catch(e) {
                         console.log("Ошибка:", e)
-
                     }
 
                 }
@@ -94,6 +97,7 @@
     });
 
    socket.on('connect', () => {
+       has_connection = true
        status.textContent = 'Соединение установлено!';
 
        const name = nameInput.value;
@@ -106,6 +110,7 @@
        status.textContent = 'Попытка переподключения...';
    });
    socket.on('reconnect', () => {
+       has_connection = true
        status.textContent = 'Соединение восстановлено!';
    });
    socket.on('connect_error', (err) => {
