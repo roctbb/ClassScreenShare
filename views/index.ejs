@@ -93,6 +93,7 @@
     });
 
     socket.on('disconnect', () => {
+       has_connection = false
        status.textContent = 'Соединение потеряно. Попытка переподключения...';
     });
 
@@ -114,6 +115,7 @@
        status.textContent = 'Соединение восстановлено!';
    });
    socket.on('connect_error', (err) => {
+       has_connection = false
        status.textContent = 'Ошибка подключения: ' + err.message;
    });
 </script>
