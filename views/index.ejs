@@ -15,9 +15,16 @@
 <!-- Элемент для отображения обратной связи -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    const socket = io();
+    const socket = io({
+       reconnection: true,              // Включить автоматические попытки переподключения
+       reconnectionAttempts: 5,          // Ограничение на количество попыток (по умолчанию бесконечно)
+       reconnectionDelay: 1000,          // Задержка перед первой попыткой (в миллисекундах)
+       reconnectionDelayMax: 5000,       // Максимальная задержка между попытками
+       timeout: 20000                    // Тайм-аут соединения (в миллисекундах)
+   });
     const startSharing = document.getElementById('startSharing');
     const nameInput = document.getElementById('name');
+    const status = document.getElementById('status');
 
     startSharing.addEventListener('click', async () => {
         const name = nameInput.value;
@@ -28,7 +35,6 @@
 
         socket.emit('join', {name: name});
 
-        const status = document.getElementById('status');
         try {
             // Прячем поле ввода и кнопку после начала трансляции
             document.getElementById('login').style.display = 'none';
@@ -49,8 +55,6 @@
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
 
-            status.textContent = 'Передача экрана началась! Не закрывайте вкладку!';
-
             setInterval(() => {
                 // Захватываем кадры и уменьшаем их
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -65,7 +69,15 @@
 
                     // Преобразуем уменьшенное изображение в Data URL
                     const imgData = canvas.toDataURL('image/webp', 0.8); // Уменьшаем также качество до 70%
-                    socket.emit('share_screen', imgData);
+                    try {
+                        socket.emit('share_screen', imgData);
+                        status.textContent = 'Передача экрана началась! Не закрывайте вкладку!';
+                    }
+                    catch(e) {
+                        console.log("Ошибка:", e)
+
+                    }
+
                 }
             }, 5000);
         } catch (err) {
@@ -76,6 +88,29 @@
             document.getElementById('login').style.display = '';
         }
     });
+
+    socket.on('disconnect', () => {
+       status.textContent = 'Соединение потеряно. Попытка переподключения...';
+    });
+
+   socket.on('connect', () => {
+       status.textContent = 'Соединение установлено!';
+
+       const name = nameInput.value;
+       if (name) {
+            socket.emit('join', {name: name});
+       }
+   })
+
+   socket.on('reconnect_attempt', () => {
+       status.textContent = 'Попытка переподключения...';
+   });
+   socket.on('reconnect', () => {
+       status.textContent = 'Соединение восстановлено!';
+   });
+   socket.on('connect_error', (err) => {
+       status.textContent = 'Ошибка подключения: ' + err.message;
+   });
 </script>
 </body>
 </html>
