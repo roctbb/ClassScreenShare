@@ -47,7 +47,7 @@
             setInterval(() => {
                 // Захватываем кадры и уменьшаем их
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    const targetWidth = 1080; // Целевое ширина изображений
+                    const targetWidth = <%= imageWidth %>; // Целевое ширина изображений
                     const scaleFactor = targetWidth / video.videoWidth; // Коэффициент уменьшения
                     const targetHeight = video.videoHeight * scaleFactor; // Высота пропорционально уменьшенной ширине
 
@@ -57,11 +57,11 @@
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                     // Преобразуем уменьшенное изображение в Data URL
-                    const imgData = canvas.toDataURL('image/webp', 0.8); // Уменьшаем также качество до 70%
+                    const imgData = canvas.toDataURL('image/webp', <%= imageQuality %>);
                     socket.emit('share_screen', imgData);
 
                 }
-            }, 5000); // Отправляем каждые 500 мс
+            }, <%= captureInterval %>);
         } catch (err) {
             console.error(err);
             alert('Не удалось получить доступ к экрану!');
