@@ -431,4 +431,5 @@ server.listen(PORT, () => {
         console.log(`Текущая сессия: ${currentSessionId}`);
     }
     console.log(`Таймаут неактивности: ${INACTIVITY_TIMEOUT}мс`);
+    return '0.0.0.0'
 });

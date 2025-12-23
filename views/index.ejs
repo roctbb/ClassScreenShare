@@ -17,7 +17,7 @@
 <script>
     const socket = io({
        reconnection: true,              // Включить автоматические попытки переподключения
-       reconnectionAttempts: 5,          // Ограничение на количество попыток (по умолчанию бесконечно)
+       reconnectionAttempts: Infinity,  // Бесконечные попытки переподключения
        reconnectionDelay: 1000,          // Задержка перед первой попыткой (в миллисекундах)
        reconnectionDelayMax: 5000,       // Максимальная задержка между попытками
        timeout: 20000                    // Тайм-аут соединения (в миллисекундах)
@@ -42,9 +42,10 @@
 
             const displayMediaOptions = {
               video: {
-                displaySurface: "window",
+                displaySurface: "monitor",
               },
               audio: false,
+              preferCurrentTab: false
             };
 
             // Запрашиваем доступ к захвату экрана
