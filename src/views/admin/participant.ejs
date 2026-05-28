@@ -3,7 +3,8 @@ participant.lastSeenAt ?? participant.last_seen_at; %> <% const recordingStatus 
 recording.status ? recording.status : ''; %> <% const durationMs = recording ? (recording.durationMs
 ?? recording.duration_ms) : null; %> <% const sizeBytes = recording ? (recording.sizeBytes ??
 recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && sizeBytes != null; %>
-<% const hasConnectionEvents = connectionSummary && connectionSummary.totalSessions > 0; %>
+<% const hasConnectionEvents = connectionSummary && connectionSummary.totalSessions > 0; %> <% const
+examStartedAt = exam.startedAt ?? exam.started_at; %>
 <div class="page participant-page">
     <div class="page-header participant-page-header">
         <a class="back-link" href="/admin/exams/<%= exam.id %>">← К экзамену <%= exam.name %></a>
@@ -205,7 +206,8 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
             mode: 'slideshow',
             framesUrl: '/admin/api/participants/<%= participant.id %>/frames',
             frameUrlBase: '/admin/api/frames/',
-            examStartedAt: <%= exam.started_at ? new Date(exam.started_at).getTime() : 'null' %>,
+            examStartedAt: <%= examStartedAt ? new Date(examStartedAt).getTime() : 'null' %>,
+            connectionEvents: <%- JSON.stringify(connectionEvents || []) %>,
             maxGapSeconds: <%= typeof maxGapSeconds !== 'undefined' ? maxGapSeconds : 5 %>,
             expectedFrameIntervalMs: <%= exam.captureInterval ?? exam.capture_interval ?? 5000 %>,
             maxMissedFrames: 3,

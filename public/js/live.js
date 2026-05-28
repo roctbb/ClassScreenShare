@@ -211,29 +211,38 @@
     updateAudioButton();
 
     // ---------- Log ----------
-    const LOG_STORAGE_KEY = `cs.log.${cfg.examId}`;
     const LOG_MAX = 100;
 
-    function loadLogFromStorage() {
-        try {
-            const raw = localStorage.getItem(LOG_STORAGE_KEY);
-            if (!raw) return [];
-            const data = JSON.parse(raw);
-            return Array.isArray(data) ? data : [];
-        } catch {
-            return [];
-        }
+    let logItems = [];
+
+    function formatLogTime(value) {
+        const date = value ? new Date(value) : new Date();
+        if (Number.isNaN(date.getTime())) return new Date().toLocaleTimeString('ru-RU');
+        return date.toLocaleTimeString('ru-RU');
     }
 
-    function saveLogToStorage(items) {
-        try {
-            localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(items.slice(0, LOG_MAX)));
-        } catch {
-            /* ignore quota errors */
-        }
+    function connectionLogHtml(event) {
+        const name = escapeHtml(event.name || '?');
+        const reason =
+            event.reasonLabel && event.event === 'disconnect'
+                ? ` <span class="muted">(${escapeHtml(event.reasonLabel)})</span>`
+                : '';
+        if (event.event === 'disconnect') return `Отключился <strong>${name}</strong>${reason}`;
+        return `Подключился <strong>${name}</strong>`;
     }
 
-    let logItems = loadLogFromStorage();
+    function connectionLogKind(event) {
+        return event.event === 'disconnect' ? 'log-leave' : 'log-join';
+    }
+
+    function setLogFromServer(events) {
+        logItems = (Array.isArray(events) ? events : []).slice(0, LOG_MAX).map((event) => ({
+            time: formatLogTime(event.createdAt),
+            html: connectionLogHtml(event),
+            kind: connectionLogKind(event),
+        }));
+        renderLog();
+    }
 
     function renderLog() {
         const emptyLog = $('log-empty');
@@ -258,11 +267,10 @@
         }
     }
 
-    function logEvent(html, klass) {
-        const time = new Date().toLocaleTimeString('ru-RU');
+    function logEvent(html, klass, createdAt) {
+        const time = formatLogTime(createdAt);
         logItems.unshift({ time, html, kind: klass || '' });
         if (logItems.length > LOG_MAX) logItems = logItems.slice(0, LOG_MAX);
-        saveLogToStorage(logItems);
         renderLog();
     }
 
@@ -270,7 +278,6 @@
     if (logClearBtn) {
         logClearBtn.addEventListener('click', () => {
             logItems = [];
-            saveLogToStorage(logItems);
             renderLog();
         });
     }
@@ -579,6 +586,7 @@
                 logEvent('Не удалось подписаться: ' + (resp && resp.reason), 'log-error');
                 return;
             }
+            setLogFromServer(resp.logEvents);
             // Перерисовать карточки исходя из актуального списка.
             for (const pid of [...cards.keys()]) removeCard(pid);
             connected.clear();
@@ -626,7 +634,7 @@
             }
         }
     });
-    socket.on('participant:join', ({ participantId, name }) => {
+    socket.on('participant:join', ({ participantId, name, createdAt }) => {
         const pid = Number(participantId);
         const isNew = !cards.has(pid);
         ensureCard(pid, name);
@@ -635,24 +643,35 @@
         refreshCount();
         applyCardFilter();
         if (isNew) {
-            logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
+            logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join', createdAt);
             showToast(`Подключился: ${name}`, 'success');
         } else {
-            logEvent(`Переподключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
+            logEvent(`Переподключился <strong>${escapeHtml(name)}</strong>`, 'log-join', createdAt);
             showToast(`Переподключился: ${name}`, 'info');
         }
         playConnectSound();
     });
-    socket.on('participant:leave', ({ participantId }) => {
-        const pid = Number(participantId);
-        const card = cards.get(pid);
-        const name = card ? card.dataset.name : '?';
-        if (card) setCardConnected(pid, false);
-        else refreshCount();
-        playDisconnectAlert();
-        logEvent(`Отключился <strong>${escapeHtml(name)}</strong>`, 'log-leave');
-        showToast(`Отключился: ${name}`, 'warn');
-    });
+    socket.on(
+        'participant:leave',
+        ({ participantId, name: eventName, reason, reasonLabel, createdAt }) => {
+            const pid = Number(participantId);
+            const card = cards.get(pid);
+            const name = eventName || (card ? card.dataset.name : '?');
+            if (card) setCardConnected(pid, false);
+            else refreshCount();
+            playDisconnectAlert();
+            const reasonText =
+                reasonLabel || reason
+                    ? ` <span class="muted">(${escapeHtml(reasonLabel || reason)})</span>`
+                    : '';
+            logEvent(
+                `Отключился <strong>${escapeHtml(name)}</strong>${reasonText}`,
+                'log-leave',
+                createdAt
+            );
+            showToast(`Отключился: ${name}`, 'warn');
+        }
+    );
     socket.on('participant:stale', ({ participantId, silentMs }) => {
         const pid = Number(participantId);
         if (!cards.has(pid)) return;

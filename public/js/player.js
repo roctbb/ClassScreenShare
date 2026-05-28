@@ -49,6 +49,20 @@
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
     }
 
+    function escapeHtml(value) {
+        return String(value).replace(
+            /[&<>"']/g,
+            (char) =>
+                ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                })[char]
+        );
+    }
+
     function buildSpeedButtons() {
         speedsBox.innerHTML = '';
         SPEEDS.forEach((sp) => {
@@ -87,6 +101,17 @@
                     ` data-real="${real}" data-startms="${startMs}" data-endms="${endMs}" />`
             );
         }
+        for (const marker of timeline.connectionMarkers || []) {
+            if (marker.atMs < 0 || marker.atMs > total) continue;
+            const x = (marker.atMs / total) * W;
+            const stroke = marker.event === 'disconnect' ? '#ef4444' : '#2563eb';
+            const label = marker.event === 'disconnect' ? 'Отключение' : 'Подключение';
+            parts.push(
+                `<line class="tl-connection-marker" x1="${x}" y1="3" x2="${x}" y2="${H - 3}"` +
+                    ` stroke="${stroke}" stroke-width="3" data-label="${label}"` +
+                    ` data-time="${fmtTime(marker.atMs)}" />`
+            );
+        }
         parts.push(
             `<line id="tl-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#1f2937" stroke-width="2" />`
         );
@@ -106,6 +131,12 @@
             if (target && target.classList && target.classList.contains('tl-gap')) {
                 const real = target.getAttribute('data-real');
                 tlTooltip.innerHTML = `<strong>Нет связи ${real} сек</strong><br><small>${fmtTime(displayMs)}</small>`;
+            } else if (
+                target &&
+                target.classList &&
+                target.classList.contains('tl-connection-marker')
+            ) {
+                tlTooltip.innerHTML = `<strong>${escapeHtml(target.getAttribute('data-label'))}</strong><br><small>${escapeHtml(target.getAttribute('data-time'))}</small>`;
             } else {
                 tlTooltip.textContent = fmtTime(displayMs);
             }
@@ -120,7 +151,7 @@
         const cursor = document.getElementById('tl-cursor');
         if (!cursor || !timeline || !timeline.totalDurationMs) return;
         const total = timeline.realTotalDurationMs || timeline.totalDurationMs;
-        const displayMs = recordingElapsedAtVideoMs(ms);
+        const displayMs = examElapsedAtVideoMs(ms);
         const x = (displayMs / total) * 1000;
         cursor.setAttribute('x1', String(x));
         cursor.setAttribute('x2', String(x));
@@ -154,6 +185,7 @@
         const gaps = [];
         let offset = 0;
         const firstTs = frames.length ? Number(frames[0].ts) : 0;
+        const originTs = cfg.examStartedAt || firstTs;
         for (let i = 0; i < frames.length; i++) {
             const cur = frames[i];
             const next = frames[i + 1];
@@ -164,8 +196,8 @@
                 d = isConnectionGap ? Math.min(realGap, maxGapMs) : realGap;
                 if (isConnectionGap) {
                     const gapStartMs = offset + Math.min(defaultDurationMs, d);
-                    const realStartMs = cur.ts - firstTs + Math.min(defaultDurationMs, d);
-                    const realEndMs = next.ts - firstTs;
+                    const realStartMs = cur.ts - originTs + Math.min(defaultDurationMs, d);
+                    const realEndMs = next.ts - originTs;
                     gaps.push({
                         startMs: gapStartMs,
                         endMs: offset + d,
@@ -181,13 +213,21 @@
             result.push({ id: cur.id, ts: cur.ts, vo: offset, d });
             offset += d;
         }
+        const connectionMarkers = (Array.isArray(cfg.connectionEvents) ? cfg.connectionEvents : [])
+            .map((event) => ({
+                event: event.event,
+                atMs: new Date(event.createdAt).getTime() - originTs,
+            }))
+            .filter((event) => Number.isFinite(event.atMs));
         return {
             totalDurationMs: offset,
             realTotalDurationMs: result.length
-                ? result[result.length - 1].ts - firstTs + result[result.length - 1].d
+                ? result[result.length - 1].ts - originTs + result[result.length - 1].d
                 : 0,
             frames: result,
             gaps,
+            connectionMarkers,
+            originTs,
         };
     }
 
@@ -256,22 +296,17 @@
         return cur.ts + localFrac * realIntervalMs;
     }
 
-    function recordingElapsedAtVideoMs(videoMs) {
-        const frames = timeline.frames;
-        if (!frames.length) return 0;
-        return realTimestampAtVideoMs(videoMs) - frames[0].ts;
-    }
-
     function examElapsedAtVideoMs(videoMs) {
         const frames = timeline.frames;
         if (!frames.length) return 0;
-        return realTimestampAtVideoMs(videoMs) - (cfg.examStartedAt || frames[0].ts);
+        return realTimestampAtVideoMs(videoMs) - (timeline.originTs || frames[0].ts);
     }
 
     function displayToVideoMs(displayMs) {
         const frames = timeline.frames;
         if (!frames.length) return 0;
-        const targetTs = frames[0].ts + displayMs;
+        const targetTs = (timeline.originTs || frames[0].ts) + displayMs;
+        if (targetTs <= frames[0].ts) return 0;
         let idx = frames.length - 1;
         for (let i = 0; i < frames.length - 1; i++) {
             if (targetTs >= frames[i].ts && targetTs < frames[i + 1].ts) {

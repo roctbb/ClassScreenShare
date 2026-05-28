@@ -1,6 +1,6 @@
 'use strict';
 
-const { ParticipantConnection } = require('../db/models');
+const { ParticipantConnection, Participant } = require('../db/models');
 const logger = require('../logger');
 
 function truncate(value, max) {
@@ -41,7 +41,10 @@ async function recordSocketEvent(socket, event, reason = null) {
 async function listForParticipant(participantId, { limit = 100 } = {}) {
     return ParticipantConnection.findAll({
         where: { participantId },
-        order: [['created_at', 'DESC']],
+        order: [
+            ['created_at', 'DESC'],
+            ['id', 'DESC'],
+        ],
         limit,
     });
 }
@@ -62,6 +65,26 @@ async function listForExam(examId) {
         byParticipant.get(pid).push(log);
     }
     return byParticipant;
+}
+
+async function listLiveEventsForExam(examId, { limit = 100 } = {}) {
+    const events = await ParticipantConnection.findAll({
+        where: { examId },
+        include: [
+            {
+                model: Participant,
+                as: 'participant',
+                attributes: ['id', 'name'],
+                required: false,
+            },
+        ],
+        order: [
+            ['created_at', 'DESC'],
+            ['id', 'DESC'],
+        ],
+        limit,
+    });
+    return events.map(serializeLiveEvent);
 }
 
 function valueOf(event, camel, snake) {
@@ -90,6 +113,22 @@ function humanReason(reason) {
         'server namespace disconnect': 'сервер отключил',
     };
     return map[reason] || reason || '';
+}
+
+function serializeLiveEvent(event, fallback = {}) {
+    if (!event) return null;
+    const eventType = valueOf(event, 'event', 'event');
+    const reason = valueOf(event, 'reason', 'reason') || '';
+    const createdAt = valueOf(event, 'createdAt', 'created_at') || fallback.createdAt || null;
+    const participant = event.participant || fallback.participant || null;
+    return {
+        participantId: valueOf(event, 'participantId', 'participant_id') || fallback.participantId,
+        name: (participant && participant.name) || fallback.name || '',
+        event: eventType,
+        reason,
+        reasonLabel: humanReason(reason),
+        createdAt: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
+    };
 }
 
 function durationLabel(ms) {
@@ -228,6 +267,8 @@ module.exports = {
     recordSocketEvent,
     listForParticipant,
     listForExam,
+    listLiveEventsForExam,
+    serializeLiveEvent,
     buildConnectionSessions,
     durationLabel,
     calcTotalAbsenceMs,

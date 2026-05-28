@@ -144,7 +144,12 @@ function attachPublisher(io) {
                 .catch(() => {});
             framesService.clearState(participantId);
             participantsService.flushTouch(participantId).catch(() => {});
-            bus.emit('leave', { examId, participantId });
+            bus.emit('leave', {
+                examId,
+                participantId,
+                name: participantName,
+                reason: finalReason,
+            });
         });
     });
 

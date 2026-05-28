@@ -235,10 +235,21 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
         if (!exam) return next();
 
         const frameCount = await Frame.count({ where: { participantId: pid } });
-        const connectionLogs = await participantConnectionsService.listForParticipant(pid);
+        const connectionLogs = await participantConnectionsService.listForParticipant(pid, {
+            limit: 500,
+        });
         const connectionTimeline = participantConnectionsService.buildConnectionSessions(
             connectionLogs.map((log) => log.toJSON())
         );
+        const connectionEvents = connectionLogs
+            .map((log) => {
+                const event = participantConnectionsService.serializeLiveEvent(log, {
+                    participantId: participant.id,
+                    name: participant.name,
+                });
+                return event ? { event: event.event, createdAt: event.createdAt } : null;
+            })
+            .filter(Boolean);
 
         res.renderPage('admin/participant', {
             title: `${participant.name} — ${exam.name}`,
@@ -248,6 +259,7 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
             frameCount,
             connectionSessions: connectionTimeline.sessions,
             connectionSummary: connectionTimeline.summary,
+            connectionEvents,
             maxGapSeconds: config.video.maxGapSeconds,
         });
     } catch (err) {

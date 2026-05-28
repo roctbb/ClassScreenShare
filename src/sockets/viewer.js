@@ -4,6 +4,7 @@ const { Exam, Participant, User, Frame } = require('../db/models');
 const bus = require('../services/bus');
 const config = require('../config');
 const logger = require('../logger');
+const participantConnectionsService = require('../services/participantConnections');
 
 /**
  * Привязывает express-session middleware к указанному socket.io namespace.
@@ -39,12 +40,32 @@ function registerBusListeners(ns) {
         ns.to(`exam:${examId}`).emit('frame', { participantId, ts, dataUrl });
     });
     bus.on('join', ({ examId, participantId, name }) => {
-        ns.to(`exam:${examId}`).emit('participant:join', { participantId, name, online: true });
+        const event = participantConnectionsService.serializeLiveEvent(
+            { participantId, event: 'connect' },
+            { participantId, name }
+        );
+        ns.to(`exam:${examId}`).emit('participant:join', {
+            participantId,
+            name,
+            online: true,
+            createdAt: event.createdAt,
+        });
     });
-    bus.on('leave', ({ examId, participantId }) => {
+    bus.on('leave', ({ examId, participantId, name, reason }) => {
         const m = lastFrameMap.get(examId);
         if (m) m.delete(participantId);
-        ns.to(`exam:${examId}`).emit('participant:leave', { participantId, online: false });
+        const event = participantConnectionsService.serializeLiveEvent(
+            { participantId, event: 'disconnect', reason },
+            { participantId, name }
+        );
+        ns.to(`exam:${examId}`).emit('participant:leave', {
+            participantId,
+            name,
+            reason,
+            reasonLabel: event.reasonLabel,
+            online: false,
+            createdAt: event.createdAt,
+        });
     });
 
     // При завершении экзамена — чистим in-memory state.
@@ -150,6 +171,7 @@ function attachViewer(io, sessionMiddleware) {
                         })
                     )
                 );
+                const logEvents = await participantConnectionsService.listLiveEventsForExam(examId);
                 if (typeof ack === 'function') {
                     ack({
                         ok: true,
@@ -167,6 +189,7 @@ function attachViewer(io, sessionMiddleware) {
                             online: onlineIds.has(p.id),
                             lastFrameTs: lastFrames[i] ? Number(lastFrames[i].ts) : null,
                         })),
+                        logEvents,
                     });
                 }
             } catch (err) {

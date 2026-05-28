@@ -1389,6 +1389,15 @@ label {
     opacity: 0.85;
 }
 
+.timeline .tl-connection-marker {
+    cursor: pointer;
+    vector-effect: non-scaling-stroke;
+}
+
+.timeline .tl-connection-marker:hover {
+    stroke-width: 5;
+}
+
 .timeline-tooltip {
     position: absolute;
     bottom: 48px;

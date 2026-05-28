@@ -294,6 +294,43 @@ describe('participant connection logs', () => {
         expect(map.get(p2.participant.id)).toHaveLength(1);
     });
 
+    it('listLiveEventsForExam returns journal events with participant names', async () => {
+        const exam = await examsService.createExam({ name: 'Test' });
+        const { participant } = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'Иван',
+            geekclassId: '42',
+        });
+        await ParticipantConnection.create({
+            participantId: participant.id,
+            examId: exam.id,
+            socketId: 's1',
+            event: 'connect',
+        });
+        await ParticipantConnection.create({
+            participantId: participant.id,
+            examId: exam.id,
+            socketId: 's1',
+            event: 'disconnect',
+            reason: 'transport close',
+        });
+
+        const events = await participantConnectionsService.listLiveEventsForExam(exam.id);
+
+        expect(events).toHaveLength(2);
+        expect(events[0]).toMatchObject({
+            participantId: participant.id,
+            name: 'Иван',
+            event: 'disconnect',
+            reasonLabel: 'соединение закрыто',
+        });
+        expect(events[1]).toMatchObject({
+            participantId: participant.id,
+            name: 'Иван',
+            event: 'connect',
+        });
+    });
+
     it('builds readable connection sessions from socket events', () => {
         const startedAt = new Date('2026-05-28T10:00:00Z');
         const endedAt = new Date('2026-05-28T10:01:05Z');
