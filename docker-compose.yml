@@ -1,29 +1,70 @@
-version: '3.8'
-
 services:
-  proctoring:
+  postgres:
+    image: postgres:16-alpine
+    container_name: classscreenshare-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-classscreenshare}
+      POSTGRES_USER: ${DB_USER:-classscreenshare}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-classscreenshare}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-classscreenshare} -d ${DB_NAME:-classscreenshare}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cs-net
+
+  app:
     build: .
-    container_name: proctoring-server
+    container_name: classscreenshare-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      - PASSWORD=${PASSWORD:-admin}
-      - PORT=3000
-      - ENABLE_RECORDING=${ENABLE_RECORDING:-true}
-      - RECORDINGS_DIR=/app/recordings
-      - CAPTURE_INTERVAL=${CAPTURE_INTERVAL:-5000}
-      - IMAGE_QUALITY=${IMAGE_QUALITY:-0.8}
-      - IMAGE_WIDTH=${IMAGE_WIDTH:-1080}
-      - INACTIVITY_TIMEOUT=${INACTIVITY_TIMEOUT:-15000}
-      - VIDEO_FPS=${VIDEO_FPS:-2}
-      - VIDEO_FORMAT=${VIDEO_FORMAT:-mp4}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      SESSION_SECRET: ${SESSION_SECRET}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-classscreenshare}
+      DB_USER: ${DB_USER:-classscreenshare}
+      DB_PASSWORD: ${DB_PASSWORD:-classscreenshare}
+      ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      GEEKCLASS_HOST: ${GEEKCLASS_HOST:-}
+      GEEKCLASS_JWT_SECRET: ${GEEKCLASS_JWT_SECRET:-}
+      RECORDINGS_DIR: /app/recordings
+      DEFAULT_CAPTURE_INTERVAL: ${DEFAULT_CAPTURE_INTERVAL:-5000}
+      DEFAULT_IMAGE_QUALITY: ${DEFAULT_IMAGE_QUALITY:-0.8}
+      DEFAULT_IMAGE_WIDTH: ${DEFAULT_IMAGE_WIDTH:-1080}
+      INACTIVITY_TIMEOUT: ${INACTIVITY_TIMEOUT:-15000}
+      VIDEO_FPS: ${VIDEO_FPS:-2}
+      VIDEO_FORMAT: ${VIDEO_FORMAT:-mp4}
+      VIDEO_MAX_GAP_SECONDS: ${VIDEO_MAX_GAP_SECONDS:-5}
+      VIDEO_CONCURRENCY: ${VIDEO_CONCURRENCY:-2}
+      MAX_FRAME_BYTES: ${MAX_FRAME_BYTES:-2097152}
     volumes:
-      # Монтируем директорию для записей на хост
       - ./recordings:/app/recordings
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
-      - proctoring-network
+      - cs-net
+
+volumes:
+  postgres-data:
 
 networks:
-  proctoring-network:
+  cs-net:
     driver: bridge

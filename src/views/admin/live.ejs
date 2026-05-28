@@ -1,0 +1,51 @@
+<div class="live-page">
+    <header class="live-header">
+        <a class="back-link" href="/admin/exams/<%= exam.id %>">← К экзамену</a>
+        <h1>Live: <%= exam.name %></h1>
+        <span id="conn-status" class="conn-status conn-disconnected">
+            <span class="conn-dot"></span><span id="conn-text">Подключение…</span>
+        </span>
+        <div class="live-stats">
+            <span>Активных: <strong id="live-count">0</strong></span>
+            <span class="muted" id="stale-count" style="display: none"
+                >Молчат: <strong id="stale-num">0</strong></span
+            >
+        </div>
+        <button class="btn btn-secondary btn-sm" type="button" id="mute-btn">🔔 Звук</button>
+    </header>
+
+    <div class="live-body">
+        <div class="live-grid" id="grid">
+            <% if (participants.length === 0) { %>
+            <div class="live-empty muted" id="empty-state">
+                Ожидание участников. Раздайте ссылку: <code><%- exam.code %></code>
+            </div>
+            <% } else { %> <% participants.forEach(p => { %>
+            <div class="screen-card" data-pid="<%= p.id %>" data-name="<%= p.name %>">
+                <div class="screen-name">
+                    <span><%= p.name %></span
+                    ><span class="screen-since muted" data-since-for="<%= p.id %>">—</span>
+                </div>
+                <div class="screen-img">
+                    <span class="screen-placeholder muted">Ожидание кадра…</span>
+                </div>
+            </div>
+            <% }) %> <% } %>
+        </div>
+
+        <aside class="live-log">
+            <h3>Журнал</h3>
+            <ul id="log-list"></ul>
+        </aside>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    window.__LIVE__ = {
+        examId: <%= exam.id %>,
+        inactivityTimeout: <%= inactivityTimeout %>,
+        captureInterval: <%= exam.capture_interval %>
+    };
+</script>
+<script src="/js/live.js"></script>

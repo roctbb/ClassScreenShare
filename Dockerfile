@@ -1,23 +1,21 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
-# Устанавливаем ffmpeg для конвертации видео
-RUN apk add --no-cache ffmpeg
+# ffmpeg для конвертации, tini для корректного PID 1 и graceful shutdown,
+# python3+make+g++ нужны на момент сборки native-зависимостей (bcrypt).
+RUN apk add --no-cache ffmpeg tini \
+ && apk add --no-cache --virtual .build-deps python3 make g++
 
-# Создаем рабочую директорию
 WORKDIR /app
 
-# Копируем package.json и устанавливаем зависимости
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev \
+ && apk del .build-deps
 
-# Копируем остальные файлы приложения
 COPY . .
 
-# Создаем директорию для записей
 RUN mkdir -p /app/recordings
 
-# Открываем порт
 EXPOSE 3000
 
-# Запускаем приложение
-CMD ["node", "share_server.js"]
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "src/server.js"]

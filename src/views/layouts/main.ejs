@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title><%= title || 'ClassScreenShare' %></title>
+        <link rel="stylesheet" href="/css/main.css" />
+        <% if (typeof headExtra !== 'undefined') { %><%- headExtra %><% } %>
+    </head>
+    <body>
+        <header class="topbar">
+            <a class="brand" href="/">📹 ClassScreenShare</a>
+            <% if (typeof user !== 'undefined' && user) { %>
+            <nav class="nav">
+                <a href="/admin">Экзамены</a>
+                <span class="user"><%= user.name || user.login %></span>
+                <a href="/auth/logout" class="logout">Выйти</a>
+            </nav>
+            <% } %>
+        </header>
+        <main class="main"><%- body %></main>
+        <% if (typeof scripts !== 'undefined') { %><%- scripts %><% } %>
+    </body>
+</html>

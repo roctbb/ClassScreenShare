@@ -1,0 +1,83 @@
+<div class="exam-page">
+    <header class="exam-header">
+        <h1><%= exam.name %></h1>
+        <div id="conn-status" class="conn-status conn-disconnected" title="Состояние соединения">
+            <span class="conn-dot"></span><span id="conn-text">Не подключено</span>
+        </div>
+    </header>
+
+    <!-- Этап 1: ввод имени -->
+    <section id="step-name" class="card<%= participant ? ' hidden' : '' %>">
+        <h2>Подключение к экзамену</h2>
+        <p class="muted">
+            Введите фамилию и имя так, как вас знает преподаватель. После начала демонстрации экрана
+            не закрывайте эту вкладку до конца экзамена.
+        </p>
+        <form id="name-form">
+            <div class="form-group">
+                <label for="name">Имя</label>
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Иванов Иван"
+                    required
+                    maxlength="120"
+                    autocomplete="name"
+                    autofocus
+                    value="<%= participant ? participant.name : '' %>"
+                />
+            </div>
+            <div id="name-error" class="alert alert-error hidden"></div>
+            <button type="submit" class="btn">Продолжить</button>
+        </form>
+    </section>
+
+    <!-- Этап 2: захват экрана -->
+    <section id="step-share" class="card<%= participant ? '' : ' hidden' %>">
+        <h2>Готовы поделиться экраном?</h2>
+        <p>
+            Здравствуйте,
+            <strong id="hello-name"><%= participant ? participant.name : '' %></strong>.
+        </p>
+        <p>
+            При нажатии кнопки браузер попросит выбрать, что показывать. Выберите
+            <strong>«Экран»</strong> (или «Весь экран»), а не отдельную вкладку.
+        </p>
+        <p class="muted">
+            Изображение будет передаваться раз в <%= Math.round(captureInterval / 1000) %> сек.
+        </p>
+        <button id="start-share" class="btn btn-success">Начать демонстрацию экрана</button>
+    </section>
+
+    <!-- Этап 3: идёт запись -->
+    <section id="step-recording" class="card hidden">
+        <h2>Идёт демонстрация экрана</h2>
+        <p>Не закрывайте эту вкладку до окончания экзамена.</p>
+        <div id="rec-stats" class="kv">
+            <dt>Кадров отправлено:</dt>
+            <dd id="frames-sent">0</dd>
+            <dt>Последний кадр:</dt>
+            <dd id="last-frame">—</dd>
+            <dt>Состояние:</dt>
+            <dd id="rec-status">—</dd>
+        </div>
+        <video id="preview" autoplay muted playsinline></video>
+        <div class="actions-row" style="margin-top: 12px">
+            <button id="leave-btn" class="btn btn-danger">Завершить</button>
+        </div>
+    </section>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    window.__EXAM__ = {
+        code: <%- JSON.stringify(exam.code) %>,
+        name: <%- JSON.stringify(exam.name) %>,
+        captureInterval: <%= captureInterval %>,
+        imageQuality: <%= imageQuality %>,
+        imageWidth: <%= imageWidth %>,
+        participant: <%- participant ? JSON.stringify({ id: participant.id, name: participant.name }) : 'null' %>
+    };
+</script>
+<script src="/js/exam.js"></script>
