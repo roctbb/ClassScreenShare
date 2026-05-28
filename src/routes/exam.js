@@ -175,6 +175,17 @@ router.get('/exam/:code', loadActiveExam, async (req, res, next) => {
         if (token) {
             participant = await participantsService.findByToken(exam.id, token);
         }
+        const requireGeekclass = Boolean(exam.requireGeekclass);
+        if (!participant && requireGeekclass) {
+            if (!config.geekclass.enabled) {
+                return res.status(503).renderPage('error', {
+                    title: 'GeekClass недоступен',
+                    message:
+                        'Для этого экзамена обязателен вход через GeekClass, но он не настроен.',
+                });
+            }
+            return res.redirect(`/exam/${encodeURIComponent(exam.code)}/geekclass`);
+        }
 
         res.renderPage('exam/index', {
             title: exam.name,
@@ -184,6 +195,7 @@ router.get('/exam/:code', loadActiveExam, async (req, res, next) => {
             imageQuality: exam.imageQuality,
             imageWidth: exam.imageWidth,
             geekclassEnabled: config.geekclass.enabled,
+            requireGeekclass,
         });
     } catch (err) {
         next(err);
@@ -195,6 +207,12 @@ router.get('/exam/:code', loadActiveExam, async (req, res, next) => {
 router.post('/api/exam/:code/join', loadActiveExam, async (req, res, next) => {
     try {
         const exam = req.exam;
+        if (exam.requireGeekclass) {
+            return res.status(403).json({
+                ok: false,
+                error: 'geekclass_required',
+            });
+        }
         const parsed = joinSchema.safeParse(req.body || {});
         if (!parsed.success) {
             return res.status(400).json({

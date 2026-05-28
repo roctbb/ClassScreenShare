@@ -50,6 +50,17 @@ describe('exams service', () => {
         expect(exam.code).toBe('MATH-9');
     });
 
+    it('stores GeekClass-only entry setting', async () => {
+        const regular = await examsService.createExam({ name: 'Обычный экзамен' });
+        const required = await examsService.createExam({
+            name: 'GeekClass экзамен',
+            requireGeekclass: true,
+        });
+
+        expect(regular.requireGeekclass).toBe(false);
+        expect(required.requireGeekclass).toBe(true);
+    });
+
     it('rejects duplicate manual code', async () => {
         await examsService.createExam({ name: 'Алгебра', code: 'MATH-9' });
         await expect(

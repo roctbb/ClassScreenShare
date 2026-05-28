@@ -16,8 +16,10 @@
         <div class="card">
             <h2>Подключение участников</h2>
             <p class="muted">
-                Раздайте ссылку участникам экзамена. Каждый сможет подключиться по этой ссылке,
-                ввести имя и начать делиться экраном.
+                Раздайте ссылку участникам экзамена. Каждый сможет подключиться по этой ссылке, <%
+                if (exam.require_geekclass) { %>авторизоваться через GeekClass и начать делиться
+                экраном.<% } else { %>ввести имя или войти через GeekClass и начать делиться
+                экраном.<% } %>
             </p>
             <p><strong>Код:</strong> <code class="code-pill"><%= exam.code %></code></p>
             <p>
@@ -44,6 +46,10 @@
                 <dd><%= exam.image_quality %></dd>
                 <dt>Ширина:</dt>
                 <dd><%= exam.image_width %> px</dd>
+                <dt>Вход:</dt>
+                <dd>
+                    <%= exam.require_geekclass ? 'только GeekClass' : 'имя вручную или GeekClass' %>
+                </dd>
                 <dt>Создан:</dt>
                 <dd><%= new Date(exam.created_at).toLocaleString('ru-RU') %></dd>
                 <% if (exam.started_at) { %>

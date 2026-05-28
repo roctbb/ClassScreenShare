@@ -31,7 +31,14 @@ router.post('/exams', async (req, res, next) => {
             return res.redirect('/admin?error=empty');
         }
         const code = String(req.body.code || '').trim();
-        const exam = await examsService.createExam({ name, code, createdBy: req.user.id });
+        const requireGeekclass =
+            req.body.requireGeekclass === '1' || req.body.requireGeekclass === 'on';
+        const exam = await examsService.createExam({
+            name,
+            code,
+            requireGeekclass,
+            createdBy: req.user.id,
+        });
         req.log.info({ examId: exam.id, code: exam.code }, 'exam created');
         return res.redirect(`/admin/exams/${exam.id}`);
     } catch (err) {

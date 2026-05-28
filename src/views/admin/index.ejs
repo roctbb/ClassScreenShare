@@ -50,6 +50,13 @@
                     title="От 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание"
                 />
             </div>
+            <label class="form-check geekclass-required-check" for="require-geekclass">
+                <input id="require-geekclass" type="checkbox" name="requireGeekclass" value="1" />
+                <span>
+                    <strong>Только через GeekClass</strong>
+                    <small>Ученика сразу отправит на авторизацию</small>
+                </span>
+            </label>
             <div class="form-actions">
                 <button type="submit" class="btn">Создать</button>
             </div>
@@ -65,6 +72,7 @@
                 <tr>
                     <th>Название</th>
                     <th>Код</th>
+                    <th>Вход</th>
                     <th>Статус</th>
                     <th>Участников</th>
                     <th>Создан</th>
@@ -76,6 +84,7 @@
                 <tr>
                     <td><a href="/admin/exams/<%= exam.id %>"><%= exam.name %></a></td>
                     <td><code><%= exam.code %></code></td>
+                    <td class="muted"><%= exam.require_geekclass ? 'GeekClass' : 'любой' %></td>
                     <td>
                         <span class="badge badge-<%= exam.status %>">
                             <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ?

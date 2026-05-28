@@ -272,27 +272,33 @@
         setStep('name');
     }
 
-    nameForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        nameError.classList.add('hidden');
-        const name = nameInput.value.trim();
-        if (!name) {
-            nameError.textContent = 'Введите имя';
-            nameError.classList.remove('hidden');
-            return;
-        }
-        try {
-            const data = await join(name);
-            state.participantName = data.participant.name;
-            helloName.textContent = state.participantName;
-            setStep('share');
-        } catch (err) {
-            nameError.textContent = err.message;
-            nameError.classList.remove('hidden');
-        }
-    });
+    if (nameForm) {
+        nameForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            nameError.classList.add('hidden');
+            const name = nameInput.value.trim();
+            if (!name) {
+                nameError.textContent = 'Введите имя';
+                nameError.classList.remove('hidden');
+                return;
+            }
+            try {
+                const data = await join(name);
+                state.participantName = data.participant.name;
+                helloName.textContent = state.participantName;
+                setStep('share');
+            } catch (err) {
+                nameError.textContent = err.message;
+                nameError.classList.remove('hidden');
+            }
+        });
+    }
 
     startBtn.addEventListener('click', () => {
+        if (cfg.requireGeekclass) {
+            startSharing();
+            return;
+        }
         // Если cookie уже есть, но в БД participant'а нет (например, экзамен пересоздали),
         // socket connect упадёт с no_token. Перед стартом ещё раз обновим join.
         join(state.participantName)

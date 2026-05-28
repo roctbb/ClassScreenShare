@@ -14,7 +14,7 @@ const MAX_CODE_RETRIES = 5;
 /**
  * Создаёт экзамен. На коллизии кода делает retry.
  */
-async function createExam({ name, createdBy, code = null }) {
+async function createExam({ name, createdBy, code = null, requireGeekclass = false }) {
     const trimmed = String(name || '').trim();
     if (!trimmed) {
         const err = new Error('name is required');
@@ -37,6 +37,7 @@ async function createExam({ name, createdBy, code = null }) {
                 code: manualCode || generateCode(),
                 status: Exam.STATUS.DRAFT,
                 createdBy: createdBy || null,
+                requireGeekclass: Boolean(requireGeekclass),
                 captureInterval: config.capture.interval,
                 imageQuality: config.capture.quality,
                 imageWidth: config.capture.width,
