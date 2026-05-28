@@ -23,14 +23,22 @@
         ctx: null,
         videoEl: null,
         captureTimer: null,
+        watchdogTimer: null,
         sent: 0,
         connected: false,
         audioCtx: null,
         beepTimer: null,
+        lastAcceptedFrameAt: 0,
+        captureStopped: false,
+        intentionalStop: false,
     };
 
-    function show(el) { el.classList.remove('hidden'); }
-    function hide(el) { el.classList.add('hidden'); }
+    function show(el) {
+        el.classList.remove('hidden');
+    }
+    function hide(el) {
+        el.classList.add('hidden');
+    }
 
     function setConn(s) {
         connStatus.classList.remove('conn-connected', 'conn-disconnected', 'conn-warn');
@@ -52,7 +60,10 @@
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             state.audioCtx = new Ctx();
-        } catch { state.audioCtx = null; }
+            if (state.audioCtx.state === 'suspended') state.audioCtx.resume().catch(() => {});
+        } catch {
+            state.audioCtx = null;
+        }
     }
     function beep() {
         if (!state.audioCtx) return;
@@ -81,7 +92,10 @@
         state.beepTimer = setInterval(beep, 3000);
     }
     function stopBeeping() {
-        if (state.beepTimer) { clearInterval(state.beepTimer); state.beepTimer = null; }
+        if (state.beepTimer) {
+            clearInterval(state.beepTimer);
+            state.beepTimer = null;
+        }
     }
 
     // ----- Захват экрана -----
@@ -97,6 +111,9 @@
             alert('Не удалось получить доступ к экрану: ' + err.message);
             return;
         }
+        state.captureStopped = false;
+        state.intentionalStop = false;
+        state.lastAcceptedFrameAt = Date.now();
         const video = document.createElement('video');
         video.muted = true;
         video.playsInline = true;
@@ -110,8 +127,18 @@
 
         state.stream.getVideoTracks().forEach((t) => {
             t.addEventListener('ended', () => {
-                recStatus.textContent = 'Демонстрация остановлена. Перезагрузите страницу, чтобы возобновить.';
-                if (state.captureTimer) { clearInterval(state.captureTimer); state.captureTimer = null; }
+                state.captureStopped = true;
+                recStatus.textContent =
+                    'Демонстрация остановлена. Перезагрузите страницу, чтобы возобновить.';
+                if (state.captureTimer) {
+                    clearInterval(state.captureTimer);
+                    state.captureTimer = null;
+                }
+                if (state.watchdogTimer) {
+                    clearInterval(state.watchdogTimer);
+                    state.watchdogTimer = null;
+                }
+                if (!state.intentionalStop) startBeeping();
             });
         });
 
@@ -123,7 +150,22 @@
 
     function startCaptureLoop() {
         if (state.captureTimer) clearInterval(state.captureTimer);
+        if (state.watchdogTimer) clearInterval(state.watchdogTimer);
         state.captureTimer = setInterval(captureAndSend, cfg.captureInterval);
+        state.watchdogTimer = setInterval(checkFrameWatchdog, 1000);
+        captureAndSend();
+    }
+
+    function checkFrameWatchdog() {
+        if (state.captureStopped || state.intentionalStop) return;
+        if (!state.stream || !state.videoEl) return;
+        const thresholdMs = Math.max(cfg.captureInterval * 2.5, 10000);
+        const lastOk = state.lastAcceptedFrameAt || 0;
+        if (lastOk && Date.now() - lastOk > thresholdMs) {
+            recStatus.textContent =
+                'Кадры не отправляются. Проверьте демонстрацию экрана и соединение.';
+            startBeeping();
+        }
     }
 
     async function captureAndSend() {
@@ -151,14 +193,18 @@
             });
             if (ack.ok) {
                 state.sent++;
+                state.lastAcceptedFrameAt = Date.now();
                 framesSent.textContent = String(state.sent);
                 lastFrame.textContent = new Date().toLocaleTimeString('ru-RU');
                 recStatus.textContent = 'Идёт передача';
+                if (state.connected && !state.captureStopped) stopBeeping();
             } else if (ack.reason !== 'rate_limited') {
                 recStatus.textContent = 'Кадр не принят: ' + ack.reason;
+                startBeeping();
             }
         } catch {
             recStatus.textContent = 'Ошибка отправки кадра';
+            startBeeping();
         }
     }
 
@@ -173,8 +219,16 @@
         });
         state.socket = socket;
 
-        socket.on('connect', () => { state.connected = true; setConn('ok'); stopBeeping(); });
-        socket.on('disconnect', () => { state.connected = false; setConn('off'); startBeeping(); });
+        socket.on('connect', () => {
+            state.connected = true;
+            setConn('ok');
+            if (!state.captureStopped) stopBeeping();
+        });
+        socket.on('disconnect', () => {
+            state.connected = false;
+            setConn('off');
+            startBeeping();
+        });
         socket.on('connect_error', (err) => {
             state.connected = false;
             setConn('warn');
@@ -184,11 +238,20 @@
         socket.io.on('reconnect_attempt', () => setConn('warn'));
 
         socket.on('kicked', (info) => {
+            state.intentionalStop = true;
             const reason = info && info.reason ? info.reason : 'unknown';
-            recStatus.textContent = reason === 'exam_finished'
-                ? 'Экзамен завершён преподавателем. Передача остановлена.'
-                : 'Соединение разорвано сервером (' + reason + ').';
-            if (state.captureTimer) { clearInterval(state.captureTimer); state.captureTimer = null; }
+            recStatus.textContent =
+                reason === 'exam_finished'
+                    ? 'Экзамен завершён преподавателем. Передача остановлена.'
+                    : 'Соединение разорвано сервером (' + reason + ').';
+            if (state.captureTimer) {
+                clearInterval(state.captureTimer);
+                state.captureTimer = null;
+            }
+            if (state.watchdogTimer) {
+                clearInterval(state.watchdogTimer);
+                state.watchdogTimer = null;
+            }
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
             socket.io.opts.reconnection = false;
             socket.disconnect();
@@ -200,18 +263,32 @@
 
     leaveBtn.addEventListener('click', async () => {
         if (!confirm('Завершить демонстрацию и покинуть экзамен?')) return;
-        try { if (state.socket) state.socket.emit('leave'); } catch { /* ignore */ }
+        state.intentionalStop = true;
+        try {
+            if (state.socket) state.socket.emit('leave');
+        } catch {
+            /* ignore */
+        }
         try {
             await fetch('/api/exam/' + encodeURIComponent(cfg.code) + '/leave', {
-                method: 'POST', credentials: 'same-origin',
+                method: 'POST',
+                credentials: 'same-origin',
             });
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
         if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
         if (state.captureTimer) clearInterval(state.captureTimer);
+        if (state.watchdogTimer) clearInterval(state.watchdogTimer);
         location.href = '/';
     });
 
     window.addEventListener('beforeunload', () => {
-        try { if (state.socket) state.socket.disconnect(); } catch { /* ignore */ }
+        state.intentionalStop = true;
+        try {
+            if (state.socket) state.socket.disconnect();
+        } catch {
+            /* ignore */
+        }
     });
 })();
