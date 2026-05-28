@@ -16,6 +16,8 @@
     const connText = $('conn-text');
     const muteBtn = $('mute-btn');
     const filterButtons = Array.from(document.querySelectorAll('[data-live-filter]'));
+    const liveSearchInput = $('live-search-input');
+    const liveSearchClear = $('live-search-clear');
 
     const cards = new Map(); // pid -> DOMElement
     const connected = new Set(); // pids с активным publisher-сокетом
@@ -28,6 +30,7 @@
     let beepTimer = null;
     let fullscreenPid = null;
     let currentFilter = 'all';
+    let searchQuery = '';
 
     // ---------- Audio ----------
     function ensureAudio() {
@@ -314,11 +317,15 @@
         return stale.has(pid) || !connected.has(pid);
     }
     function cardMatchesFilter(pid) {
+        const card = cards.get(pid);
+        const name = String(card ? card.dataset.name : '').toLowerCase();
+        if (searchQuery && !name.includes(searchQuery)) return false;
         if (currentFilter === 'active') return connected.has(pid);
         if (currentFilter === 'problem') return isProblemParticipant(pid);
         return true;
     }
     function filterEmptyText() {
+        if (searchQuery) return 'По этому поиску участников не найдено.';
         if (currentFilter === 'active') return 'Нет активных участников в этом фильтре.';
         if (currentFilter === 'problem') return 'Проблемных участников сейчас нет.';
         return '';
@@ -366,6 +373,20 @@
     filterButtons.forEach((button) => {
         button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
         button.addEventListener('click', () => setLiveFilter(button.dataset.liveFilter || 'all'));
+    });
+
+    liveSearchInput.addEventListener('input', () => {
+        searchQuery = liveSearchInput.value.trim().toLowerCase();
+        liveSearchClear.classList.toggle('hidden', searchQuery.length === 0);
+        applyCardFilter();
+    });
+
+    liveSearchClear.addEventListener('click', () => {
+        liveSearchInput.value = '';
+        searchQuery = '';
+        liveSearchClear.classList.add('hidden');
+        liveSearchInput.focus();
+        applyCardFilter();
     });
 
     // Каждую секунду обновляем "X сек назад".

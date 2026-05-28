@@ -24,6 +24,18 @@
             <button type="button" data-live-filter="active">Активные</button>
             <button type="button" data-live-filter="problem">Проблемы</button>
         </div>
+        <div class="live-search">
+            <label class="sr-only" for="live-search-input">Найти участника</label>
+            <input
+                id="live-search-input"
+                type="search"
+                placeholder="Найти участника"
+                autocomplete="off"
+            />
+            <button class="btn btn-secondary btn-sm hidden" type="button" id="live-search-clear">
+                Очистить
+            </button>
+        </div>
     </div>
 
     <div class="live-body">
