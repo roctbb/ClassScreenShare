@@ -104,7 +104,7 @@
             timelineUrl: '/admin/api/recordings/<%= recording.id %>/timeline',
         };
     </script>
-    <script src="/js/player.js"></script>
+    <script src="/js/player.js?v=<%= assetVersion %>"></script>
 
     <% } else if (frameCount > 0) { %>
     <div class="card player-card">
@@ -135,6 +135,6 @@
             frameUrlBase: '/admin/api/frames/',
         };
     </script>
-    <script src="/js/player.js"></script>
+    <script src="/js/player.js?v=<%= assetVersion %>"></script>
     <% } %>
 </div>

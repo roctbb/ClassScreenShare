@@ -39,6 +39,7 @@ function _bool(name, def) {
 
 const NODE_ENV = str('NODE_ENV', 'development');
 const RECORDINGS_DIR = path.resolve(str('RECORDINGS_DIR', './recordings'));
+const ASSET_VERSION = str('ASSET_VERSION', String(Date.now()));
 
 const config = {
     nodeEnv: NODE_ENV,
@@ -46,6 +47,7 @@ const config = {
     port: int('PORT', 3000),
     logLevel: str('LOG_LEVEL', 'info'),
     publicUrl: str('PUBLIC_URL', `http://localhost:${int('PORT', 3000)}`).replace(/\/$/, ''),
+    assetVersion: ASSET_VERSION,
 
     sessionSecret: str('SESSION_SECRET', null),
 

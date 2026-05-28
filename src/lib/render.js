@@ -2,6 +2,7 @@
 
 const ejs = require('ejs');
 const path = require('path');
+const config = require('../config');
 
 const VIEWS_DIR = path.join(__dirname, '..', 'views');
 const LAYOUT_PATH = path.join(VIEWS_DIR, 'layouts', 'main.ejs');
@@ -24,6 +25,7 @@ function attachRenderer(app) {
                         title: ctx.title || 'ClassScreenShare',
                         user: ctx.user || res.locals.user || null,
                         hideNav: Boolean(ctx.hideNav),
+                        assetVersion: config.assetVersion,
                         scripts: ctx.scripts || '',
                         headExtra: ctx.headExtra || '',
                         body,
