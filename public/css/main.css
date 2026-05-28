@@ -617,6 +617,24 @@ label {
     color: var(--danger);
 }
 
+.participant-page {
+    max-width: 1280px;
+}
+
+.participant-page-header {
+    display: block;
+    margin-bottom: 18px;
+}
+
+.participant-page-header .back-link {
+    display: inline-flex;
+    margin-bottom: 10px;
+}
+
+.participant-title h1 {
+    margin-bottom: 2px;
+}
+
 .participant-summary {
     margin-bottom: 10px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -626,7 +644,7 @@ label {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin: 0 0 16px;
+    margin: 2px 0 16px;
 }
 
 .copy-feedback {
@@ -1464,8 +1482,13 @@ label {
 }
 
 @keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
 }
 
 .live-inline-header .live-stats {
@@ -1476,7 +1499,9 @@ label {
     margin-left: 0;
 }
 
-.live-inline-header .live-stats .text-success { color: var(--success); }
+.live-inline-header .live-stats .text-success {
+    color: var(--success);
+}
 
 .live-search-box {
     position: relative;
@@ -1690,7 +1715,9 @@ label {
     user-select: none;
 }
 
-.connection-log-summary::-webkit-details-marker { display: none; }
+.connection-log-summary::-webkit-details-marker {
+    display: none;
+}
 
 .connection-log-details[open] .connection-log-summary {
     margin-bottom: 12px;
@@ -1749,7 +1776,9 @@ label {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
     opacity: 0;
     transform: translateX(20px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
     pointer-events: auto;
     max-width: 320px;
 }
@@ -1828,7 +1857,9 @@ label {
     font-size: 13px;
     background: #fef2f2;
     border: 1px solid #fecaca;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
 }
 
 .roster-item.roster-online {
@@ -1843,8 +1874,13 @@ label {
 }
 
 @keyframes pulse-amber {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.0); }
-    50% { box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18); }
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18);
+    }
 }
 
 .roster-link {
@@ -1914,6 +1950,12 @@ label {
     font-variant-numeric: tabular-nums;
 }
 
-.text-success { color: var(--success); }
-.text-danger { color: var(--danger); }
-.text-warning { color: var(--warning); }
+.text-success {
+    color: var(--success);
+}
+.text-danger {
+    color: var(--danger);
+}
+.text-warning {
+    color: var(--warning);
+}
