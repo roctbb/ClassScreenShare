@@ -1,3 +1,9 @@
+<% const totalFrames = participants.reduce((sum, p) => sum + (Number(p.frameCount) || 0), 0); %> <%
+const recordingStatus = (p) => (p.recording && p.recording.status ? p.recording.status : ''); %> <%
+const readyVideos = participants.filter((p) => recordingStatus(p) === 'done').length; %> <% const
+convertingVideos = participants.filter((p) => ['pending', 'running'].includes(recordingStatus(p))
+).length; %> <% const failedVideos = participants.filter((p) => recordingStatus(p) ===
+'failed').length; %>
 <div class="page">
     <div class="page-header">
         <a class="back-link" href="/admin">← К списку экзаменов</a>
@@ -11,6 +17,37 @@
     <% if (renamed) { %>
     <div class="alert alert-success">Название обновлено.</div>
     <% } %>
+
+    <div class="summary-grid exam-summary" aria-label="Сводка экзамена">
+        <div class="summary-tile">
+            <span class="summary-label">Участники</span>
+            <strong id="summary-participants"><%= participants.length %></strong>
+        </div>
+        <div class="summary-tile">
+            <span class="summary-label">Кадры</span>
+            <strong id="summary-frames"><%= totalFrames %></strong>
+        </div>
+        <div class="summary-tile">
+            <span class="summary-label">Видео готово</span>
+            <strong
+                ><span id="summary-video-ready"><%= readyVideos %></span>/<%= participants.length
+                %></strong
+            >
+        </div>
+        <div class="summary-tile">
+            <span class="summary-label">Конвертация</span>
+            <strong id="summary-video-converting"><%= convertingVideos %></strong>
+            <% if (failedVideos > 0) { %>
+            <small class="summary-danger">
+                Ошибки: <span id="summary-video-failed"><%= failedVideos %></span>
+            </small>
+            <% } else { %>
+            <small class="summary-danger hidden">
+                Ошибки: <span id="summary-video-failed">0</span>
+            </small>
+            <% } %>
+        </div>
+    </div>
 
     <div class="grid-2">
         <div class="card">
@@ -32,9 +69,10 @@
                     onclick="this.select()"
                 />
             </p>
-            <button class="btn btn-secondary btn-sm" type="button" onclick="copyInvite()">
+            <button class="btn btn-secondary btn-sm" type="button" id="copy-invite-btn">
                 Скопировать ссылку
             </button>
+            <span class="copy-feedback muted" id="copy-invite-feedback" aria-live="polite"></span>
         </div>
 
         <div class="card">
@@ -143,7 +181,11 @@
                 </thead>
                 <tbody>
                     <% participants.forEach(p => { %>
-                    <tr data-pid="<%= p.id %>">
+                    <tr
+                        data-pid="<%= p.id %>"
+                        data-frame-count="<%= p.frameCount || 0 %>"
+                        data-recording-status="<%= recordingStatus(p) %>"
+                    >
                         <td><%= p.name %></td>
                         <td><%= p.frameCount || 0 %></td>
                         <td class="muted"><%= new Date(p.joined_at).toLocaleString('ru-RU') %></td>
@@ -195,14 +237,6 @@
         <% } %>
     </div>
 </div>
-
-<script>
-    function copyInvite() {
-        const el = document.getElementById('invite-link');
-        el.select();
-        document.execCommand('copy');
-    }
-</script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
     window.__EXAM_PAGE__ = {
