@@ -239,6 +239,9 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
 
         const frameCount = await Frame.count({ where: { participantId: pid } });
         const connectionLogs = await participantConnectionsService.listForParticipant(pid);
+        const connectionTimeline = participantConnectionsService.buildConnectionSessions(
+            connectionLogs.map((log) => log.toJSON())
+        );
 
         res.renderPage('admin/participant', {
             title: `${participant.name} — ${exam.name}`,
@@ -246,7 +249,8 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
             participant: participant.toJSON(),
             recording: participant.recording ? participant.recording.toJSON() : null,
             frameCount,
-            connectionLogs: connectionLogs.map((log) => log.toJSON()),
+            connectionSessions: connectionTimeline.sessions,
+            connectionSummary: connectionTimeline.summary,
         });
     } catch (err) {
         next(err);

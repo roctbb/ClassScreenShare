@@ -681,6 +681,42 @@ label {
     box-shadow: none;
 }
 
+.connection-summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.connection-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.connection-state .conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.connection-state-online {
+    background: #dcfce7;
+    color: var(--success);
+}
+
+.connection-state-offline {
+    background: #f3f4f6;
+    color: var(--muted);
+}
+
 .connection-log-table code {
     white-space: nowrap;
 }

@@ -46,7 +46,131 @@ async function listForParticipant(participantId, { limit = 100 } = {}) {
     });
 }
 
+function valueOf(event, camel, snake) {
+    if (!event) return null;
+    if (typeof event.get === 'function') {
+        const value = event.get(camel);
+        if (value !== undefined) return value;
+    }
+    return event[camel] ?? event[snake] ?? null;
+}
+
+function shortSocketId(socketId) {
+    const id = String(socketId || '');
+    if (id.length <= 12) return id;
+    return `${id.slice(0, 8)}…${id.slice(-4)}`;
+}
+
+function humanReason(reason) {
+    const map = {
+        student_leave: 'ученик завершил',
+        exam_finished: 'экзамен завершён',
+        'transport close': 'соединение закрыто',
+        'transport error': 'ошибка транспорта',
+        'ping timeout': 'нет ответа',
+        'client namespace disconnect': 'клиент отключился',
+        'server namespace disconnect': 'сервер отключил',
+    };
+    return map[reason] || reason || '';
+}
+
+function durationLabel(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return '—';
+    const totalSeconds = Math.max(0, Math.round(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) return `${hours} ч ${mins} мин`;
+    if (minutes > 0) return `${minutes} мин ${seconds} сек`;
+    return `${seconds} сек`;
+}
+
+function buildConnectionSessions(events, { now = new Date() } = {}) {
+    const sorted = [...events].sort((a, b) => {
+        const aTime = new Date(valueOf(a, 'createdAt', 'created_at')).getTime();
+        const bTime = new Date(valueOf(b, 'createdAt', 'created_at')).getTime();
+        return aTime - bTime;
+    });
+    const openBySocket = new Map();
+    const sessions = [];
+
+    for (const event of sorted) {
+        const socketId = valueOf(event, 'socketId', 'socket_id');
+        const eventType = valueOf(event, 'event', 'event');
+        const createdAt = valueOf(event, 'createdAt', 'created_at');
+        const key = socketId || `unknown-${sessions.length}`;
+
+        if (eventType === 'connect') {
+            const session = {
+                socketId,
+                socketShort: shortSocketId(socketId),
+                startedAt: createdAt,
+                endedAt: null,
+                status: 'active',
+                reason: '',
+                reasonLabel: '',
+                ip: valueOf(event, 'ip', 'ip'),
+                userAgent: valueOf(event, 'userAgent', 'user_agent'),
+            };
+            sessions.push(session);
+            openBySocket.set(key, session);
+            continue;
+        }
+
+        if (eventType === 'disconnect') {
+            const session = openBySocket.get(key);
+            if (session) {
+                session.endedAt = createdAt;
+                session.status = 'closed';
+                session.reason = valueOf(event, 'reason', 'reason') || '';
+                session.reasonLabel = humanReason(session.reason);
+                openBySocket.delete(key);
+            } else {
+                sessions.push({
+                    socketId,
+                    socketShort: shortSocketId(socketId),
+                    startedAt: null,
+                    endedAt: createdAt,
+                    status: 'closed',
+                    reason: valueOf(event, 'reason', 'reason') || '',
+                    reasonLabel: humanReason(valueOf(event, 'reason', 'reason')),
+                    ip: valueOf(event, 'ip', 'ip'),
+                    userAgent: valueOf(event, 'userAgent', 'user_agent'),
+                });
+            }
+        }
+    }
+
+    const nowMs = new Date(now).getTime();
+    for (const session of sessions) {
+        const startMs = session.startedAt ? new Date(session.startedAt).getTime() : NaN;
+        const endMs = session.endedAt ? new Date(session.endedAt).getTime() : nowMs;
+        session.durationMs = startMs ? endMs - startMs : null;
+        session.durationLabel = durationLabel(session.durationMs);
+    }
+
+    sessions.sort((a, b) => {
+        const aTime = new Date(a.startedAt || a.endedAt).getTime();
+        const bTime = new Date(b.startedAt || b.endedAt).getTime();
+        return bTime - aTime;
+    });
+
+    const activeSessions = sessions.filter((session) => session.status === 'active').length;
+    return {
+        sessions,
+        summary: {
+            activeSessions,
+            totalSessions: sessions.length,
+            isOnline: activeSessions > 0,
+            lastSession: sessions[0] || null,
+        },
+    };
+}
+
 module.exports = {
     recordSocketEvent,
     listForParticipant,
+    buildConnectionSessions,
+    durationLabel,
 };

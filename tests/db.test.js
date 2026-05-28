@@ -13,6 +13,7 @@ await import('../src/db/models/index.js');
 const { User, Participant, ParticipantConnection } = await import('../src/db/models/index.js');
 const examsService = await import('../src/services/exams.js');
 const participantsService = await import('../src/services/participants.js');
+const participantConnectionsService = await import('../src/services/participantConnections.js');
 const usersService = await import('../src/services/users.js');
 
 beforeAll(async () => {
@@ -229,6 +230,53 @@ describe('participant connection logs', () => {
             where: { participantId: participant.id },
         });
         expect(count).toBe(1);
+    });
+
+    it('builds readable connection sessions from socket events', () => {
+        const startedAt = new Date('2026-05-28T10:00:00Z');
+        const endedAt = new Date('2026-05-28T10:01:05Z');
+        const timeline = participantConnectionsService.buildConnectionSessions(
+            [
+                {
+                    socketId: 'very-long-socket-id-123456',
+                    event: 'connect',
+                    ip: '127.0.0.1',
+                    userAgent: 'test-agent',
+                    createdAt: startedAt,
+                },
+                {
+                    socketId: 'very-long-socket-id-123456',
+                    event: 'disconnect',
+                    reason: 'transport close',
+                    createdAt: endedAt,
+                },
+            ],
+            { now: new Date('2026-05-28T10:02:00Z') }
+        );
+
+        expect(timeline.summary.isOnline).toBe(false);
+        expect(timeline.summary.totalSessions).toBe(1);
+        expect(timeline.sessions[0].status).toBe('closed');
+        expect(timeline.sessions[0].durationLabel).toBe('1 мин 5 сек');
+        expect(timeline.sessions[0].reasonLabel).toBe('соединение закрыто');
+        expect(timeline.sessions[0].socketShort).toMatch(/^very-lon/);
+    });
+
+    it('marks a session as online when there is no disconnect event', () => {
+        const timeline = participantConnectionsService.buildConnectionSessions(
+            [
+                {
+                    socketId: 'socket-1',
+                    event: 'connect',
+                    createdAt: new Date('2026-05-28T10:00:00Z'),
+                },
+            ],
+            { now: new Date('2026-05-28T10:00:12Z') }
+        );
+
+        expect(timeline.summary.isOnline).toBe(true);
+        expect(timeline.summary.activeSessions).toBe(1);
+        expect(timeline.sessions[0].durationLabel).toBe('12 сек');
     });
 });
 

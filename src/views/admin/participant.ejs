@@ -75,16 +75,40 @@
     </div>
 
     <div class="card">
-        <h2>Лог подключений</h2>
-        <% if (!connectionLogs || connectionLogs.length === 0) { %>
+        <div class="card-heading">
+            <h2>Лог подключений</h2>
+            <% if (connectionSummary && connectionSummary.totalSessions > 0) { %>
+            <span
+                class="connection-state <%= connectionSummary.isOnline ? 'connection-state-online' : 'connection-state-offline' %>"
+            >
+                <span class="conn-dot"></span>
+                <%= connectionSummary.isOnline ? 'сейчас подключен' : 'сейчас отключен' %>
+            </span>
+            <% } %>
+        </div>
+        <% if (!connectionSessions || connectionSessions.length === 0) { %>
         <p class="muted">Пока нет событий подключения.</p>
         <% } else { %>
+        <div class="connection-summary-row">
+            <span>Сессий: <strong><%= connectionSummary.totalSessions %></strong></span>
+            <span>Активных: <strong><%= connectionSummary.activeSessions %></strong></span>
+            <% if (connectionSummary.lastSession && connectionSummary.lastSession.socketId) { %>
+            <span>
+                Последний socket:
+                <code title="<%= connectionSummary.lastSession.socketId %>"
+                    ><%= connectionSummary.lastSession.socketShort %></code
+                >
+            </span>
+            <% } %>
+        </div>
         <div class="table-shell connection-log-shell">
             <table class="data-table connection-log-table">
                 <thead>
                     <tr>
-                        <th>Время</th>
-                        <th>Событие</th>
+                        <th>Начало</th>
+                        <th>Окончание</th>
+                        <th>Длительность</th>
+                        <th>Статус</th>
                         <th>Socket</th>
                         <th>IP</th>
                         <th>Причина</th>
@@ -92,25 +116,34 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <% connectionLogs.forEach(event => { %>
+                    <% connectionSessions.forEach(session => { %>
                     <tr>
                         <td class="muted">
-                            <%= new Date(event.createdAt ??
-                            event.created_at).toLocaleString('ru-RU') %>
+                            <%= session.startedAt ? new
+                            Date(session.startedAt).toLocaleString('ru-RU') : '—' %>
                         </td>
+                        <td class="muted">
+                            <%= session.endedAt ? new Date(session.endedAt).toLocaleString('ru-RU')
+                            : '—' %>
+                        </td>
+                        <td><%= session.durationLabel %></td>
                         <td>
-                            <% if (event.event === 'connect') { %>
-                            <span class="badge badge-active">подключился</span>
+                            <% if (session.status === 'active') { %>
+                            <span class="badge badge-active">онлайн</span>
                             <% } else { %>
-                            <span class="badge badge-finished">отключился</span>
+                            <span class="badge badge-finished">завершено</span>
                             <% } %>
                         </td>
-                        <td><code><%= event.socketId ?? event.socket_id %></code></td>
-                        <td><%= event.ip || '—' %></td>
-                        <td class="muted"><%= event.reason || '—' %></td>
-                        <td class="muted user-agent-cell">
-                            <%= event.userAgent ?? event.user_agent ?? '—' %>
+                        <td>
+                            <code title="<%= session.socketId || '' %>"
+                                ><%= session.socketShort || '—' %></code
+                            >
                         </td>
+                        <td><%= session.ip || '—' %></td>
+                        <td class="muted" title="<%= session.reason || '' %>">
+                            <%= session.reasonLabel || '—' %>
+                        </td>
+                        <td class="muted user-agent-cell"><%= session.userAgent || '—' %></td>
                     </tr>
                     <% }) %>
                 </tbody>
