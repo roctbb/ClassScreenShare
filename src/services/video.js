@@ -46,10 +46,12 @@ function buildTimeline(frames, options = {}) {
             const realGap = Number(next.ts) - Number(cur.ts);
             durationMs = Math.min(realGap, maxGapMs);
             // Если реальный gap больше maxGapMs — это пропуск связи.
-            // Записываем его относительно video time.
+            // Последний доставленный кадр всё равно показываем хотя бы один
+            // обычный frame tick, а оставшуюся сжатую паузу помечаем как gap.
             if (realGap > maxGapMs) {
+                const gapStartMs = videoOffsetMs + Math.min(defaultDurationMs, durationMs);
                 gaps.push({
-                    startMs: videoOffsetMs,
+                    startMs: gapStartMs,
                     endMs: videoOffsetMs + durationMs,
                     realDurationMs: realGap,
                 });

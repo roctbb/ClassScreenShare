@@ -73,7 +73,9 @@
         const total = timeline.totalDurationMs;
         const W = 1000;
         const H = 40;
-        const parts = [`<rect x="0" y="8" width="${W}" height="${H - 16}" rx="4" fill="#10b981" />`];
+        const parts = [
+            `<rect x="0" y="8" width="${W}" height="${H - 16}" rx="4" fill="#10b981" />`,
+        ];
         for (const gap of timeline.gaps || []) {
             const x = (gap.startMs / total) * W;
             const w = Math.max(2, ((gap.endMs - gap.startMs) / total) * W);
@@ -149,7 +151,8 @@
                 const realGap = next.ts - cur.ts;
                 d = Math.min(realGap, maxGapMs);
                 if (realGap > maxGapMs) {
-                    gaps.push({ startMs: offset, endMs: offset + d, realDurationMs: realGap });
+                    const gapStartMs = offset + Math.min(defaultDurationMs, d);
+                    gaps.push({ startMs: gapStartMs, endMs: offset + d, realDurationMs: realGap });
                 }
             } else {
                 d = defaultDurationMs;
@@ -188,7 +191,8 @@
         setCursor(ms);
 
         // Время от начала экзамена — считаем плавно с учётом видео-времени и реальной растяжки в gap'ах.
-        if (examTimeOverlay && cfg.examStartedAt) {
+        // Если у старого экзамена нет started_at, считаем от первого полученного кадра.
+        if (examTimeOverlay) {
             const elapsed = computeRealElapsed(ms);
             examTimeOverlay.textContent = fmtExamTime(Math.max(0, elapsed));
         }
@@ -207,7 +211,7 @@
     function computeRealElapsed(videoMs) {
         const frames = timeline.frames;
         if (!frames.length) return 0;
-        const firstTs = frames[0].ts;
+        const baseTs = cfg.examStartedAt || frames[0].ts;
 
         // Найдём кадр, в котором videoMs.
         let idx = frames.length - 1;
@@ -224,7 +228,7 @@
         const localFrac = cur.d > 0 ? (videoMs - cur.vo) / cur.d : 0;
         // Реальный момент = ts текущего кадра + доля * реальный интервал
         const realTs = cur.ts + localFrac * realIntervalMs;
-        return realTs - cfg.examStartedAt;
+        return realTs - baseTs;
     }
 
     function updateSlideshow() {

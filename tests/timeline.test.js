@@ -46,7 +46,8 @@ describe('buildTimeline', () => {
         // gap зафиксирован.
         expect(r.gaps).toHaveLength(1);
         expect(r.gaps[0].realDurationMs).toBe(10000);
-        expect(r.gaps[0].startMs).toBe(2000); // прошло 0..2s до второго кадра
+        // Сначала показываем последний доставленный кадр один tick, затем чёрный gap.
+        expect(r.gaps[0].startMs).toBe(2500);
         expect(r.gaps[0].endMs).toBe(2000 + 3000); // конец gap'а в видео
     });
 
@@ -59,14 +60,14 @@ describe('buildTimeline', () => {
         expect(r.gaps).toHaveLength(2);
         expect(r.gaps[0].realDurationMs).toBe(99000);
         expect(r.gaps[1].realDurationMs).toBe(99000);
-        // Первый gap начинается в video t=1000 (после первого кадра длительностью 1000ms).
-        expect(r.gaps[0].startMs).toBe(1000);
+        // Первый gap начинается после короткого показа последнего доставленного кадра.
+        expect(r.gaps[0].startMs).toBe(1500);
         expect(r.gaps[0].endMs).toBe(6000);
         // После gap'а кадр idx=2 (101000) начинается в video t=6000, длится 1000.
         expect(r.frames[2].videoOffsetMs).toBe(6000);
         expect(r.frames[2].durationMs).toBe(1000);
         // Второй gap.
-        expect(r.gaps[1].startMs).toBe(7000);
+        expect(r.gaps[1].startMs).toBe(7500);
     });
 
     it('does not record a "gap" when interval equals maxGap exactly', () => {
