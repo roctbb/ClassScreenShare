@@ -105,11 +105,16 @@ code {
 }
 
 .main {
-    padding: 28px 24px;
+    padding: 20px 20px;
 }
 
 .page {
     max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-wide {
+    max-width: 1600px;
     margin: 0 auto;
 }
 
@@ -1048,8 +1053,23 @@ label {
     align-items: start;
 }
 
+/* 3-колоночная сетка для активного экзамена: экраны | журнал | список */
+.live-body-3col {
+    grid-template-columns: 1fr 260px 280px;
+}
+
+@media (max-width: 1280px) {
+    .live-body-3col {
+        grid-template-columns: 1fr 240px;
+    }
+    .live-body-3col .live-roster {
+        grid-column: 1 / -1;
+    }
+}
+
 @media (max-width: 1000px) {
-    .live-body {
+    .live-body,
+    .live-body-3col {
         grid-template-columns: 1fr;
     }
 }
@@ -1183,7 +1203,7 @@ label {
 }
 
 .live-log {
-    background: var(--card);
+    background: var(--surface-muted);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 12px;
@@ -1224,8 +1244,13 @@ label {
 
 .live-log .log-time {
     color: var(--muted);
-    font-size: 11px;
-    margin-right: 6px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 8px;
+    background: var(--surface-muted);
+    padding: 1px 5px;
+    border-radius: 3px;
 }
 
 .live-log .log-warn {
@@ -1376,21 +1401,84 @@ label {
 
 /* ----- Live inline (merged exam+live page) ----- */
 .live-inline-card {
-    padding: 16px;
+    padding: 14px 16px;
 }
 
 .live-inline-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
+    gap: 16px;
     flex-wrap: wrap;
-    margin-bottom: 14px;
-    padding-bottom: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
     border-bottom: 1px solid var(--border);
+    min-height: 36px;
+}
+
+.live-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.live-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .live-inline-header h2 {
     margin: 0;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.live-inline-header h2 .text-danger {
+    color: var(--danger);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+    font-size: 12px;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.live-inline-header .live-stats {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    margin-left: 0;
+}
+
+.live-inline-header .live-stats .text-success { color: var(--success); }
+
+.live-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.live-search-box i {
+    position: absolute;
+    left: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.live-search-box input[type='search'] {
+    padding-left: 30px;
+    width: 180px;
+    min-height: 32px;
+    height: 32px;
+    font-size: 13px;
 }
 
 /* ----- Compact exam page ----- */
@@ -1398,21 +1486,27 @@ label {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
+}
+
+.exam-topbar .back-link {
+    font-size: 16px;
+    color: var(--muted);
+    padding: 4px 6px;
 }
 
 .exam-title-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex: 1;
     min-width: 0;
 }
 
 .exam-title-group h1 {
     margin: 0;
-    font-size: 20px;
+    font-size: 22px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1438,9 +1532,15 @@ label {
 }
 
 .btn-icon {
-    padding: 4px 8px;
-    min-width: 32px;
+    padding: 6px 10px;
+    min-width: 34px;
+    min-height: 32px;
     text-align: center;
+    line-height: 1;
+}
+
+.btn-icon i {
+    font-size: 13px;
 }
 
 /* Инфополоса */
@@ -1449,7 +1549,7 @@ label {
     align-items: center;
     gap: 16px;
     padding: 10px 14px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
 }
 
@@ -1457,52 +1557,57 @@ label {
     display: flex;
     align-items: center;
     gap: 6px;
-    flex-shrink: 0;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .invite-input {
-    width: 260px;
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
     min-height: 32px;
+    height: 32px;
     font-size: 13px;
-    padding: 4px 8px;
+    padding: 4px 10px;
 }
 
 .exam-infobar-stats {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     font-size: 14px;
     flex-wrap: wrap;
 }
 
+.exam-infobar-stats i {
+    margin-right: 2px;
+}
+
 .exam-params-details {
-    margin-left: auto;
     font-size: 13px;
+    margin-left: auto;
 }
 
 .exam-params-details summary {
     cursor: pointer;
     user-select: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.exam-params-details summary:hover {
+    background: var(--surface-muted);
+}
+
+.exam-params-details[open] {
+    flex: 1 0 100%;
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
 }
 
 .exam-params-kv {
     margin-top: 8px;
-    font-size: 13px;
-}
-
-/* Live header compact */
-.live-header-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-    flex-wrap: wrap;
-}
-
-.live-search-compact {
-    width: 160px;
-    min-height: 32px;
-    padding: 4px 8px;
     font-size: 13px;
 }
 
@@ -1521,10 +1626,33 @@ label {
     padding: 8px 10px;
 }
 
+.cell-num {
+    font-variant-numeric: tabular-nums;
+}
+
 .participants-table .table-actions {
     display: flex;
     gap: 4px;
     align-items: center;
+    white-space: nowrap;
+}
+
+.inline-action-form {
+    display: inline-block;
+    margin: 0;
+}
+
+/* Live log header */
+.live-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 8px;
+}
+
+.live-log-header h3 {
+    margin: 0;
 }
 
 /* ----- Connection log as collapsible details ----- */
@@ -1623,3 +1751,150 @@ label {
 .toast-info {
     background: var(--accent);
 }
+
+/* ----- Live roster (compact participant list) ----- */
+.live-roster {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    position: sticky;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.live-roster-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.live-roster-header h3 {
+    margin: 0;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+}
+
+.roster-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.roster-empty {
+    padding: 12px 8px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.roster-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.roster-item.roster-online {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.roster-item.roster-stale {
+    background: #fef3c7;
+    border-color: #fde68a;
+    animation: pulse-amber 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-amber {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.0); }
+    50% { box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18); }
+}
+
+.roster-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    text-decoration: none;
+    color: var(--fg);
+}
+
+.roster-link:hover {
+    text-decoration: none;
+    color: var(--accent);
+}
+
+.roster-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    flex-shrink: 0;
+}
+
+.roster-item.roster-online .roster-status-dot {
+    background: var(--success);
+}
+
+.roster-item.roster-stale .roster-status-dot {
+    background: var(--warning);
+}
+
+.roster-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.roster-frames {
+    font-size: 12px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.roster-frames i {
+    font-size: 10px;
+    margin-right: 2px;
+}
+
+.roster-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.roster-rec i {
+    font-size: 14px;
+}
+
+.roster-absence {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-warning { color: var(--warning); }

@@ -25,6 +25,61 @@
     const lastTs = new Map(); // pid -> ms
     const stale = new Set(); // pids считаются stale прямо сейчас
 
+    // ---------- Roster (right column) ----------
+    const rosterList = $('roster-list');
+    const rosterCount = $('roster-count');
+
+    function ensureRosterItem(pid, name) {
+        if (!rosterList) return null;
+        let li = rosterList.querySelector(`li[data-pid="${pid}"]`);
+        if (li) return li;
+        const empty = $('roster-empty');
+        if (empty) empty.remove();
+        li = document.createElement('li');
+        li.className = 'roster-item roster-offline';
+        li.dataset.pid = String(pid);
+        li.dataset.name = name || '';
+        li.dataset.frameCount = '0';
+        li.dataset.recordingStatus = '';
+        li.innerHTML = `
+            <a class="roster-link" href="${rosterList.dataset.linkBase || '#'}/${pid}" title="Открыть запись">
+                <span class="roster-status-dot" aria-hidden="true"></span>
+                <span class="roster-name">${escapeHtml(name || '?')}</span>
+                <span class="roster-frames muted" title="Кадров"><i class="fas fa-image"></i> <span class="roster-frame-count">0</span></span>
+            </a>
+            <span class="roster-meta">
+                <span class="roster-rec rec-status"></span>
+                <span class="roster-absence muted"></span>
+            </span>
+        `;
+        rosterList.appendChild(li);
+        updateRosterCount();
+        return li;
+    }
+
+    function setRosterStatus(pid, status) {
+        if (!rosterList) return;
+        const li = rosterList.querySelector(`li[data-pid="${pid}"]`);
+        if (!li) return;
+        li.classList.remove('roster-online', 'roster-offline', 'roster-stale');
+        li.classList.add('roster-' + status);
+    }
+
+    function setRosterFrames(pid, count) {
+        if (!rosterList) return;
+        const li = rosterList.querySelector(`li[data-pid="${pid}"]`);
+        if (!li) return;
+        li.dataset.frameCount = String(count);
+        const cnt = li.querySelector('.roster-frame-count');
+        if (cnt) cnt.textContent = String(count);
+    }
+
+    function updateRosterCount() {
+        if (!rosterCount || !rosterList) return;
+        const total = rosterList.querySelectorAll('li[data-pid]').length;
+        rosterCount.textContent = `(${total})`;
+    }
+
     // ---------- Toasts ----------
     let toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
@@ -66,12 +121,12 @@
     }
     function updateAudioButton() {
         if (muted) {
-            muteBtn.textContent = '🔕';
+            muteBtn.innerHTML = '<i class="fas fa-bell-slash"></i>';
             muteBtn.title = 'Звук выключен — нажмите чтобы включить';
             muteBtn.classList.remove('btn-success');
             return;
         }
-        muteBtn.textContent = audioArmed ? '🔔' : '🔔̇';
+        muteBtn.innerHTML = '<i class="fas fa-bell"></i>';
         muteBtn.title = audioArmed ? 'Звук включён' : 'Нажмите чтобы включить звук';
         muteBtn.classList.toggle('btn-success', audioArmed);
     }
@@ -156,15 +211,71 @@
     updateAudioButton();
 
     // ---------- Log ----------
-    function logEvent(html, klass) {
-        const emptyLog = $('log-empty');
-        if (emptyLog) emptyLog.remove();
-        const li = document.createElement('li');
-        li.className = klass || '';
-        li.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString('ru-RU')}</span> ${html}`;
-        logList.prepend(li);
-        if (logList.children.length > 100) logList.lastChild.remove();
+    const LOG_STORAGE_KEY = `cs.log.${cfg.examId}`;
+    const LOG_MAX = 100;
+
+    function loadLogFromStorage() {
+        try {
+            const raw = localStorage.getItem(LOG_STORAGE_KEY);
+            if (!raw) return [];
+            const data = JSON.parse(raw);
+            return Array.isArray(data) ? data : [];
+        } catch {
+            return [];
+        }
     }
+
+    function saveLogToStorage(items) {
+        try {
+            localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(items.slice(0, LOG_MAX)));
+        } catch {
+            /* ignore quota errors */
+        }
+    }
+
+    let logItems = loadLogFromStorage();
+
+    function renderLog() {
+        const emptyLog = $('log-empty');
+        if (logItems.length === 0) {
+            if (!emptyLog) {
+                const li = document.createElement('li');
+                li.id = 'log-empty';
+                li.className = 'log-empty';
+                li.textContent = 'Событий пока нет.';
+                logList.innerHTML = '';
+                logList.appendChild(li);
+            }
+            return;
+        }
+        if (emptyLog) emptyLog.remove();
+        logList.innerHTML = '';
+        for (const item of logItems) {
+            const li = document.createElement('li');
+            if (item.kind) li.className = item.kind;
+            li.innerHTML = `<span class="log-time">${escapeHtml(item.time)}</span> ${item.html}`;
+            logList.appendChild(li);
+        }
+    }
+
+    function logEvent(html, klass) {
+        const time = new Date().toLocaleTimeString('ru-RU');
+        logItems.unshift({ time, html, kind: klass || '' });
+        if (logItems.length > LOG_MAX) logItems = logItems.slice(0, LOG_MAX);
+        saveLogToStorage(logItems);
+        renderLog();
+    }
+
+    const logClearBtn = $('log-clear');
+    if (logClearBtn) {
+        logClearBtn.addEventListener('click', () => {
+            logItems = [];
+            saveLogToStorage(logItems);
+            renderLog();
+        });
+    }
+
+    renderLog();
 
     // ---------- Cards ----------
     function ensureCard(pid, name) {
@@ -248,6 +359,7 @@
                 status.classList.add('hidden');
             }
             setCardSince(pid, lastTs.get(pid));
+            setRosterStatus(pid, 'online');
         } else {
             connected.delete(pid);
             card.classList.add('stale', 'disconnected');
@@ -258,6 +370,7 @@
                 status.textContent = 'Участник отключился';
                 status.classList.remove('hidden');
             }
+            setRosterStatus(pid, 'offline');
         }
         refreshProblemCounts();
         refreshBeeping();
@@ -303,6 +416,11 @@
                 status.textContent = 'Нет новых кадров';
                 status.classList.remove('hidden');
             }
+            // В roster — stale (warning), но если уже offline — оставляем offline.
+            if (rosterList) {
+                const li = rosterList.querySelector(`li[data-pid="${pid}"]`);
+                if (li && !li.classList.contains('roster-offline')) setRosterStatus(pid, 'stale');
+            }
         } else {
             card.classList.remove('stale');
             stale.delete(pid);
@@ -311,6 +429,8 @@
                 status.textContent = '';
                 status.classList.add('hidden');
             }
+            // Если карточка connected — переводим обратно в online.
+            if (connected.has(pid)) setRosterStatus(pid, 'online');
         }
         refreshProblemCounts();
         refreshBeeping();
@@ -465,6 +585,7 @@
             resp.participants.forEach((p) => {
                 const pid = Number(p.id);
                 ensureCard(pid, p.name);
+                ensureRosterItem(pid, p.name);
                 setCardConnected(pid, Boolean(p.online));
                 if (p.lastFrameTs) {
                     lastTs.set(pid, Number(p.lastFrameTs));
@@ -496,20 +617,29 @@
         lastTs.set(pid, ts);
         setCardSince(pid, ts);
         if (stale.has(pid)) setCardStale(pid, false);
+        // Инкрементим счётчик кадров в roster.
+        if (rosterList) {
+            const li = rosterList.querySelector(`li[data-pid="${pid}"]`);
+            if (li) {
+                const newCount = Number(li.dataset.frameCount || 0) + 1;
+                setRosterFrames(pid, newCount);
+            }
+        }
     });
     socket.on('participant:join', ({ participantId, name }) => {
         const pid = Number(participantId);
         const isNew = !cards.has(pid);
         ensureCard(pid, name);
+        ensureRosterItem(pid, name);
         setCardConnected(pid, true);
         refreshCount();
         applyCardFilter();
         if (isNew) {
             logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
-            showToast(`✓ Подключился: ${name}`, 'success');
+            showToast(`Подключился: ${name}`, 'success');
         } else {
             logEvent(`Переподключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
-            showToast(`↻ Переподключился: ${name}`, 'info');
+            showToast(`Переподключился: ${name}`, 'info');
         }
         playConnectSound();
     });
@@ -521,7 +651,7 @@
         else refreshCount();
         playDisconnectAlert();
         logEvent(`Отключился <strong>${escapeHtml(name)}</strong>`, 'log-leave');
-        showToast(`✗ Отключился: ${name}`, 'warn');
+        showToast(`Отключился: ${name}`, 'warn');
     });
     socket.on('participant:stale', ({ participantId, silentMs }) => {
         const pid = Number(participantId);

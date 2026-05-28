@@ -33,14 +33,14 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
         <div class="summary-tile">
             <span class="summary-label">Видео</span>
             <% if (recordingStatus === 'done') { %>
-            <strong class="summary-value-sm">✓ готово</strong>
+            <strong class="summary-value-sm"><i class="fas fa-check"></i> готово</strong>
             <% if (hasVideoMeta) { %>
             <small><%= (durationMs / 1000).toFixed(0) %> сек · <%= (sizeBytes / 1024 / 1024).toFixed(1) %> МБ</small>
             <% } %>
             <% } else if (recordingStatus === 'pending' || recordingStatus === 'running') { %>
-            <strong class="summary-value-sm">⟳ конвертируется</strong>
+            <strong class="summary-value-sm"><i class="fas fa-spinner fa-spin"></i> конвертируется</strong>
             <% } else if (recordingStatus === 'failed') { %>
-            <strong class="summary-value-sm summary-danger">✗ ошибка</strong>
+            <strong class="summary-value-sm summary-danger"><i class="fas fa-xmark"></i> ошибка</strong>
             <% } else if (frameCount > 0) { %>
             <strong class="summary-value-sm muted">слайдшоу</strong>
             <small>можно сконвертировать</small>
@@ -52,23 +52,23 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
 
     <div class="participant-jump-row">
         <% if (frameCount > 0) { %>
-        <a class="btn btn-sm btn-secondary" href="#participant-recording">▶ Просмотр записи</a>
+        <a class="btn btn-sm btn-secondary" href="#participant-recording"><i class="fas fa-play"></i> Просмотр записи</a>
         <% } %>
         <% if (frameCount > 0 && (!recording || recording.status === 'failed' || recording.status === 'done')) { %>
-        <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/convert" style="display:inline">
+        <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/convert" class="inline-action-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
             <button type="submit" class="btn btn-sm btn-secondary">
-                <%= recording && recording.status === 'done' ? '⬇ Переконвертировать' : '⬇ В видео' %>
+                <i class="fas fa-film"></i> <%= recording && recording.status === 'done' ? 'Переконвертировать' : 'В видео' %>
             </button>
         </form>
         <% } %>
         <% if (recording && recording.status === 'done') { %>
-        <a class="btn btn-sm btn-secondary" href="/admin/api/recordings/<%= recording.id %>/video?download=1">⬇ Скачать mp4</a>
+        <a class="btn btn-sm btn-secondary" href="/admin/api/recordings/<%= recording.id %>/video?download=1"><i class="fas fa-download"></i> Скачать mp4</a>
         <% } %>
         <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/delete"
-            onsubmit="return confirm('Удалить участника и все его записи? Действие необратимо.');" style="display:inline">
+            onsubmit="return confirm('Удалить участника и все его записи? Действие необратимо.');" class="inline-action-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit" class="btn btn-sm btn-danger">🗑 Удалить</button>
+            <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Удалить</button>
         </form>
     </div>
 
@@ -141,7 +141,7 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
             <div class="player-time">
                 <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
             </div>
-            <span id="gap-indicator" class="gap-indicator hidden">⚠ пропуск связи</span>
+            <span id="gap-indicator" class="gap-indicator hidden"><i class="fas fa-triangle-exclamation"></i> пропуск связи</span>
         </div>
         <div class="timeline-wrap">
             <svg class="timeline" id="timeline" viewBox="0 0 1000 40" preserveAspectRatio="none"></svg>

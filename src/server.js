@@ -55,6 +55,14 @@ async function bootstrap() {
 
     app.use('/css', express.static(path.join(__dirname, '..', 'public', 'css'), { maxAge: '7d' }));
     app.use('/js', express.static(path.join(__dirname, '..', 'public', 'js'), { maxAge: '7d' }));
+    // Font Awesome CSS + webfonts из node_modules.
+    app.use(
+        '/vendor/fa',
+        express.static(
+            path.join(__dirname, '..', 'node_modules', '@fortawesome', 'fontawesome-free'),
+            { maxAge: '30d', immutable: true }
+        )
+    );
 
     attachRenderer(app);
 
