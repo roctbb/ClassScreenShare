@@ -712,6 +712,14 @@ label {
     border: 1px solid var(--border);
 }
 
+.exam-geekclass-btn {
+    margin-top: 14px;
+}
+
+.exam-auth-divider {
+    margin: 18px 0 16px;
+}
+
 /* ----- Live monitoring ----- */
 .live-page {
     max-width: none;

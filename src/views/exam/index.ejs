@@ -13,9 +13,15 @@
     <section id="step-name" class="card<%= participant ? ' hidden' : '' %>">
         <h2>Подключение к экзамену</h2>
         <p class="muted">
-            Введите фамилию и имя так, как вас знает преподаватель. После начала демонстрации экрана
-            не закрывайте эту вкладку до конца экзамена.
+            Войдите через GeekClass или введите фамилию и имя вручную. После начала демонстрации
+            экрана не закрывайте эту вкладку до конца экзамена.
         </p>
+        <% if (geekclassEnabled) { %>
+        <a class="btn auth-btn-block exam-geekclass-btn" href="/exam/<%= exam.code %>/geekclass">
+            Войти через GeekClass
+        </a>
+        <div class="auth-divider exam-auth-divider"><span>или</span></div>
+        <% } %>
         <form id="name-form">
             <div class="form-group">
                 <label for="name">Имя</label>
