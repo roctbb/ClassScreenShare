@@ -17,7 +17,7 @@ function attachRenderer(app) {
             try {
                 const fullView = path.join(VIEWS_DIR, `${view}.ejs`);
                 // res.locals (csrfToken, user, ...) делаем доступными во view.
-                const ctx = { ...res.locals, ...data };
+                const ctx = { ...res.locals, assetVersion: config.assetVersion, ...data };
                 const body = await ejs.renderFile(fullView, ctx, { async: false });
                 const html = await ejs.renderFile(
                     LAYOUT_PATH,
