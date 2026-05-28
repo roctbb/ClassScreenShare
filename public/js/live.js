@@ -172,10 +172,27 @@
         liveCount.textContent = String(cards.size);
     }
 
+    function hydrateInitialCards() {
+        grid.querySelectorAll('.screen-card[data-pid]').forEach((card) => {
+            const pid = Number(card.dataset.pid);
+            if (!Number.isInteger(pid) || pid <= 0) return;
+            const name =
+                card.dataset.name ||
+                card.querySelector('.screen-name span:first-child')?.textContent ||
+                '';
+            card.dataset.name = name;
+            card.addEventListener('click', () => toggleFullscreen(pid));
+            cards.set(pid, card);
+        });
+        refreshCount();
+    }
+
     // Каждую секунду обновляем "X сек назад".
     setInterval(() => {
         for (const [pid, ts] of lastTs) setCardSince(pid, ts);
     }, 1000);
+
+    hydrateInitialCards();
 
     // ---------- Socket ----------
     const socket = io('/viewer', {
