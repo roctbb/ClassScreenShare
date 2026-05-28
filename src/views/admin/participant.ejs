@@ -1,3 +1,9 @@
+<% const joinedAt = participant.joinedAt ?? participant.joined_at; %> <% const lastSeenAt =
+participant.lastSeenAt ?? participant.last_seen_at; %> <% const recordingStatus = recording &&
+recording.status ? recording.status : ''; %> <% const durationMs = recording ? (recording.durationMs
+?? recording.duration_ms) : null; %> <% const sizeBytes = recording ? (recording.sizeBytes ??
+recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && sizeBytes != null; %>
+<% const hasConnectionEvents = connectionSummary && connectionSummary.totalSessions > 0; %>
 <div class="page">
     <div class="page-header">
         <a class="back-link" href="/admin/exams/<%= exam.id %>">← К экзамену <%= exam.name %></a>
@@ -7,31 +13,76 @@
         </div>
     </div>
 
+    <div class="summary-grid participant-summary" aria-label="Сводка участника">
+        <div class="summary-tile">
+            <span class="summary-label">Кадры</span>
+            <strong><%= frameCount %></strong>
+        </div>
+        <div class="summary-tile">
+            <span class="summary-label">Подключение</span>
+            <strong class="summary-value-sm">
+                <% if (hasConnectionEvents) { %> <%= connectionSummary.isOnline ? 'онлайн' :
+                'отключен' %> <% } else { %>нет событий<% } %>
+            </strong>
+            <% if (hasConnectionEvents) { %>
+            <small>Сессий: <%= connectionSummary.totalSessions %></small>
+            <% } %>
+        </div>
+        <div class="summary-tile">
+            <span class="summary-label">Последний кадр</span>
+            <strong class="summary-value-sm">
+                <%= lastSeenAt ? new Date(lastSeenAt).toLocaleString('ru-RU') : '—' %>
+            </strong>
+        </div>
+        <div class="summary-tile">
+            <span class="summary-label">Видео</span>
+            <% if (recordingStatus === 'done') { %>
+            <strong class="summary-value-sm">готово</strong>
+            <% if (hasVideoMeta) { %>
+            <small
+                ><%= (durationMs / 1000).toFixed(1) %> сек, <%= (sizeBytes / 1024).toFixed(0) %>
+                КБ</small
+            >
+            <% } %> <% } else if (recordingStatus === 'pending' || recordingStatus === 'running') {
+            %>
+            <strong class="summary-value-sm">конвертируется</strong>
+            <% } else if (recordingStatus === 'failed') { %>
+            <strong class="summary-value-sm summary-danger">ошибка</strong>
+            <% } else if (frameCount > 0) { %>
+            <strong class="summary-value-sm">покадрово</strong>
+            <% } else { %>
+            <strong class="summary-value-sm">нет кадров</strong>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="participant-jump-row">
+        <a class="btn btn-sm btn-secondary" href="#connection-log">Лог подключений</a>
+        <% if (frameCount > 0) { %>
+        <a class="btn btn-sm btn-secondary" href="#participant-recording">Просмотр записи</a>
+        <% } %>
+    </div>
+
     <div class="card">
         <h2>Информация</h2>
         <dl class="kv">
             <dt>Кадров записано:</dt>
             <dd><%= frameCount %></dd>
             <dt>Подключился:</dt>
-            <dd>
-                <%= new Date(participant.joinedAt ?? participant.joined_at).toLocaleString('ru-RU')
-                %>
-            </dd>
-            <% const lastSeenAt = participant.lastSeenAt ?? participant.last_seen_at; %> <% if
-            (lastSeenAt) { %>
+            <dd><%= new Date(joinedAt).toLocaleString('ru-RU') %></dd>
+            <% if (lastSeenAt) { %>
             <dt>Последний кадр:</dt>
             <dd><%= new Date(lastSeenAt).toLocaleString('ru-RU') %></dd>
             <% } %>
             <dt>Статус видео:</dt>
             <dd>
-                <% if (recording && recording.status === 'done') { %> <% const durationMs =
-                recording.durationMs ?? recording.duration_ms; %> <% const sizeBytes =
-                recording.sizeBytes ?? recording.size_bytes; %>
-                <span class="badge badge-active">готово</span> (<%= (durationMs / 1000).toFixed(1)
-                %> сек, <%= (sizeBytes / 1024).toFixed(0) %> КБ) <% } else if (recording &&
-                (recording.status === 'pending' || recording.status === 'running')) { %>
+                <% if (recordingStatus === 'done') { %>
+                <span class="badge badge-active">готово</span>
+                <% if (hasVideoMeta) { %> (<%= (durationMs / 1000).toFixed(1) %> сек, <%= (sizeBytes
+                / 1024).toFixed(0) %> КБ) <% } %> <% } else if (recordingStatus === 'pending' ||
+                recordingStatus === 'running') { %>
                 <span class="badge badge-draft">конвертируется</span>
-                <% } else if (recording && recording.status === 'failed') { %>
+                <% } else if (recordingStatus === 'failed') { %>
                 <span class="badge badge-finished">ошибка</span>
                 <details class="error-details">
                     <summary>Подробности</summary>
@@ -74,7 +125,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="connection-log">
         <div class="card-heading">
             <h2>Лог подключений</h2>
             <% if (connectionSummary && connectionSummary.totalSessions > 0) { %>
@@ -153,7 +204,7 @@
     </div>
 
     <% if (recording && recording.status === 'done') { %>
-    <div class="card player-card">
+    <div class="card player-card" id="participant-recording">
         <div class="player-wrap">
             <video id="player" controls preload="metadata" playsinline>
                 <source
@@ -190,7 +241,7 @@
     <script src="/js/player.js?v=<%= assetVersion %>"></script>
 
     <% } else if (frameCount > 0) { %>
-    <div class="card player-card">
+    <div class="card player-card" id="participant-recording">
         <p class="muted player-note">Видео ещё не готово. Покадровый просмотр доступен ниже.</p>
         <div class="player-wrap"><img id="slideshow-img" alt="кадр" /></div>
         <div class="player-controls">

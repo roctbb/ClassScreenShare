@@ -598,6 +598,11 @@ label {
     line-height: 1.1;
 }
 
+.summary-tile .summary-value-sm {
+    font-size: 18px;
+    line-height: 1.25;
+}
+
 .summary-tile small {
     display: block;
     margin-top: 6px;
@@ -605,6 +610,17 @@ label {
 
 .summary-danger {
     color: var(--danger);
+}
+
+.participant-summary {
+    margin-bottom: 10px;
+}
+
+.participant-jump-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 16px;
 }
 
 .copy-feedback {
