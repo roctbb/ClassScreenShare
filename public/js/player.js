@@ -185,12 +185,12 @@
         playPauseBtn.addEventListener('click', () => {
             if (slideshowState.playing) {
                 slideshowState.playing = false;
-                playPauseBtn.textContent = '▶ Воспроизвести';
+                playPauseBtn.textContent = 'Воспроизвести';
                 if (slideshowState.rafId) cancelAnimationFrame(slideshowState.rafId);
             } else {
                 if (slideshowState.currentMs >= durationMs) slideshowState.currentMs = 0;
                 slideshowState.playing = true;
-                playPauseBtn.textContent = '⏸ Пауза';
+                playPauseBtn.textContent = 'Пауза';
                 slideshowState.lastTickAt = performance.now();
                 tickSlideshow();
             }
@@ -263,7 +263,7 @@
         if (slideshowState.currentMs >= durationMs) {
             slideshowState.currentMs = durationMs;
             slideshowState.playing = false;
-            playPauseBtn.textContent = '▶ Воспроизвести';
+            playPauseBtn.textContent = 'Воспроизвести';
             updateSlideshow();
             return;
         }

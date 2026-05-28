@@ -9,6 +9,7 @@ const crypto = require('crypto');
  */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
+const MANUAL_CODE_RE = /^[A-Z0-9][A-Z0-9_-]{2,15}$/;
 
 /**
  * Генерирует случайный код экзамена.
@@ -23,6 +24,19 @@ function generateCode(length = CODE_LENGTH) {
     return out;
 }
 
+function normalizeExamCode(input) {
+    const code = String(input || '')
+        .trim()
+        .toUpperCase();
+    if (!code) return '';
+    if (!MANUAL_CODE_RE.test(code)) {
+        const err = new Error('exam code must be 3..16 chars: A-Z, 0-9, _ or -');
+        err.status = 400;
+        throw err;
+    }
+    return code;
+}
+
 /**
  * Безопасный редирект — только относительные пути в рамках нашего домена.
  */
@@ -32,4 +46,11 @@ function safeNext(input, fallback = '/admin') {
     return input;
 }
 
-module.exports = { generateCode, safeNext, CODE_ALPHABET, CODE_LENGTH };
+module.exports = {
+    generateCode,
+    normalizeExamCode,
+    safeNext,
+    CODE_ALPHABET,
+    CODE_LENGTH,
+    MANUAL_CODE_RE,
+};

@@ -9,8 +9,10 @@
     </head>
     <body>
         <header class="topbar">
-            <a class="brand" href="/">📹 ClassScreenShare</a>
-            <% if (typeof user !== 'undefined' && user) { %>
+            <a class="brand" href="/"
+                ><span class="brand-mark">CS</span><span>ClassScreenShare</span></a
+            >
+            <% if (typeof user !== 'undefined' && user && !hideNav) { %>
             <nav class="nav">
                 <a href="/admin">Экзамены</a>
                 <span class="user"><%= user.name || user.login %></span>

@@ -30,12 +30,18 @@ router.post('/exams', async (req, res, next) => {
         if (!name) {
             return res.redirect('/admin?error=empty');
         }
-        const exam = await examsService.createExam({ name, createdBy: req.user.id });
+        const code = String(req.body.code || '').trim();
+        const exam = await examsService.createExam({ name, code, createdBy: req.user.id });
         req.log.info({ examId: exam.id, code: exam.code }, 'exam created');
         return res.redirect(`/admin/exams/${exam.id}`);
     } catch (err) {
         if (err.status === 400) {
-            return res.redirect('/admin?error=invalid');
+            return res.redirect(
+                '/admin?error=' + (err.message.includes('code') ? 'bad_code' : 'invalid')
+            );
+        }
+        if (err.status === 409) {
+            return res.redirect('/admin?error=code_exists');
         }
         next(err);
     }

@@ -69,7 +69,7 @@
     muteBtn.addEventListener('click', () => {
         ensureAudio();
         muted = !muted;
-        muteBtn.textContent = muted ? '🔕 Звук' : '🔔 Звук';
+        muteBtn.textContent = muted ? 'Звук выключен' : 'Звук включен';
         if (muted) stopBeeping();
         else if (stale.size > 0) startBeeping();
     });
@@ -149,7 +149,7 @@
             stale.delete(pid);
         }
         staleNum.textContent = String(stale.size);
-        staleCount.style.display = stale.size > 0 ? '' : 'none';
+        staleCount.classList.toggle('hidden', stale.size === 0);
         refreshBeeping();
     }
 
@@ -249,7 +249,7 @@
         if (!stale.has(participantId)) {
             const card = cards.get(participantId);
             logEvent(
-                `⚠️ <strong>${escapeHtml(card.dataset.name)}</strong> молчит ${Math.round(silentMs / 1000)} сек`,
+                `<strong>${escapeHtml(card.dataset.name)}</strong> молчит ${Math.round(silentMs / 1000)} сек`,
                 'log-warn'
             );
         }

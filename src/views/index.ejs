@@ -1,11 +1,32 @@
-<div class="page">
-    <h1>📹 ClassScreenShare</h1>
-    <p class="muted">Система прокторинга экзаменов.</p>
-    <div class="card">
-        <p>
-            Если вы участник экзамена — откройте ссылку, выданную преподавателем, формата
-            <code><%= publicUrl %>/exam/&lt;код&gt;</code>.
-        </p>
-        <p>Если вы преподаватель — <a href="/admin">войдите в панель управления</a>.</p>
-    </div>
+<div class="entry-page">
+    <section class="entry-panel">
+        <div class="entry-brand">
+            <span class="brand-mark brand-mark-lg">CS</span>
+            <span>ClassScreenShare</span>
+        </div>
+        <h1>Вход в экзамен</h1>
+        <p class="muted">Введите код, который выдал преподаватель.</p>
+
+        <% if (error === 'bad_code') { %>
+        <div class="alert alert-error">
+            Код должен быть от 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание.
+        </div>
+        <% } %>
+
+        <form method="get" action="/exam" class="join-code-form">
+            <label for="code">Код экзамена</label>
+            <div class="join-code-row">
+                <input
+                    id="code"
+                    type="text"
+                    name="code"
+                    placeholder="Например: ALGEBRA-9"
+                    required
+                    autocomplete="off"
+                    autofocus
+                />
+                <button type="submit" class="btn">Войти</button>
+            </div>
+        </form>
+    </section>
 </div>

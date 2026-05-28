@@ -1,6 +1,9 @@
 <div class="exam-page">
     <header class="exam-header">
-        <h1><%= exam.name %></h1>
+        <div>
+            <h1><%= exam.name %></h1>
+            <p class="page-subtitle">Подключение участника</p>
+        </div>
         <div id="conn-status" class="conn-status conn-disconnected" title="Состояние соединения">
             <span class="conn-dot"></span><span id="conn-text">Не подключено</span>
         </div>
@@ -63,7 +66,7 @@
             <dd id="rec-status">—</dd>
         </div>
         <video id="preview" autoplay muted playsinline></video>
-        <div class="actions-row" style="margin-top: 12px">
+        <div class="actions-row section-actions">
             <button id="leave-btn" class="btn btn-danger">Завершить</button>
         </div>
     </section>

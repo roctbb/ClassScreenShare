@@ -56,7 +56,7 @@
         if (status === 'pending' || status === 'running') return '';
         const label = status === 'done' ? 'Переконв.' : 'В видео';
         return `
-            <form method="post" action="/admin/exams/${cfg.examId}/participants/${pid}/convert" style="display:inline">
+            <form method="post" action="/admin/exams/${cfg.examId}/participants/${pid}/convert" class="inline-action-form">
                 <input type="hidden" name="_csrf" value="${cfg.csrf}">
                 <button type="submit" class="btn btn-sm btn-secondary">${label}</button>
             </form>

@@ -97,7 +97,12 @@ async function bootstrap() {
     app.use('/admin', csrfGuard, require('./routes/admin'));
 
     app.get('/', (_req, res) => {
-        res.renderPage('index', { title: 'ClassScreenShare', publicUrl: config.publicUrl });
+        res.renderPage('index', {
+            title: 'ClassScreenShare',
+            publicUrl: config.publicUrl,
+            error: _req.query.error || null,
+            hideNav: true,
+        });
     });
 
     // 404

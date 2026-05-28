@@ -4,7 +4,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { UniqueConstraintError } = require('sequelize');
 const { Exam, Participant, Frame, Recording, sequelize } = require('../db/models');
-const { generateCode } = require('../lib/util');
+const { generateCode, normalizeExamCode } = require('../lib/util');
 const config = require('../config');
 const logger = require('../logger');
 const bus = require('./bus');
@@ -14,7 +14,7 @@ const MAX_CODE_RETRIES = 5;
 /**
  * Создаёт экзамен. На коллизии кода делает retry.
  */
-async function createExam({ name, createdBy }) {
+async function createExam({ name, createdBy, code = null }) {
     const trimmed = String(name || '').trim();
     if (!trimmed) {
         const err = new Error('name is required');
@@ -27,11 +27,14 @@ async function createExam({ name, createdBy }) {
         throw err;
     }
 
-    for (let i = 0; i < MAX_CODE_RETRIES; i++) {
+    const manualCode = normalizeExamCode(code);
+    const attempts = manualCode ? 1 : MAX_CODE_RETRIES;
+
+    for (let i = 0; i < attempts; i++) {
         try {
             return await Exam.create({
                 name: trimmed,
-                code: generateCode(),
+                code: manualCode || generateCode(),
                 status: Exam.STATUS.DRAFT,
                 createdBy: createdBy || null,
                 captureInterval: config.capture.interval,
@@ -40,6 +43,11 @@ async function createExam({ name, createdBy }) {
             });
         } catch (err) {
             if (err instanceof UniqueConstraintError && err.fields && err.fields.code) {
+                if (manualCode) {
+                    const duplicate = new Error('exam code already exists');
+                    duplicate.status = 409;
+                    throw duplicate;
+                }
                 logger.warn({ attempt: i + 1 }, 'exam code collision, retrying');
                 continue;
             }

@@ -4,6 +4,7 @@ const express = require('express');
 const { z } = require('zod');
 const examsService = require('../services/exams');
 const participantsService = require('../services/participants');
+const { normalizeExamCode } = require('../lib/util');
 
 const router = express.Router();
 
@@ -31,6 +32,17 @@ function setParticipantCookie(res, token) {
     });
 }
 
+function codeFromInput(input) {
+    const raw = String(input || '').trim();
+    if (!raw) return '';
+    try {
+        const url = new URL(raw);
+        return normalizeExamCode(url.pathname.split('/').filter(Boolean).pop() || '');
+    } catch {
+        return normalizeExamCode(raw);
+    }
+}
+
 // Промежуточный лог-helper, чтобы admin/exam ссылка отрабатывалась только
 // для активных экзаменов.
 async function loadActiveExam(req, res, next) {
@@ -54,6 +66,16 @@ async function loadActiveExam(req, res, next) {
     req.exam = exam;
     next();
 }
+
+router.get('/exam', (req, res) => {
+    try {
+        const code = codeFromInput(req.query.code);
+        if (!code) return res.redirect('/');
+        return res.redirect(`/exam/${encodeURIComponent(code)}`);
+    } catch {
+        return res.redirect('/?error=bad_code');
+    }
+});
 
 // Страница участника: форма имени, после сабмита — захват экрана.
 router.get('/exam/:code', loadActiveExam, async (req, res, next) => {

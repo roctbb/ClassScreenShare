@@ -7,11 +7,11 @@
         </span>
         <div class="live-stats">
             <span>Активных: <strong id="live-count">0</strong></span>
-            <span class="muted" id="stale-count" style="display: none"
+            <span class="muted hidden" id="stale-count"
                 >Молчат: <strong id="stale-num">0</strong></span
             >
         </div>
-        <button class="btn btn-secondary btn-sm" type="button" id="mute-btn">🔔 Звук</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="mute-btn">Звук включен</button>
     </header>
 
     <div class="live-body">
@@ -23,8 +23,8 @@
             <% } else { %> <% participants.forEach(p => { %>
             <div class="screen-card" data-pid="<%= p.id %>" data-name="<%= p.name %>">
                 <div class="screen-name">
-                    <span><%= p.name %></span
-                    ><span class="screen-since muted" data-since-for="<%= p.id %>">—</span>
+                    <span><%= p.name %></span>
+                    <span class="screen-since muted" data-since-for="<%= p.id %>">—</span>
                 </div>
                 <div class="screen-img">
                     <span class="screen-placeholder muted">Ожидание кадра…</span>

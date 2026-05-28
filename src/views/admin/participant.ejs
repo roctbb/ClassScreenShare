@@ -1,110 +1,140 @@
 <div class="page">
     <div class="page-header">
         <a class="back-link" href="/admin/exams/<%= exam.id %>">← К экзамену <%= exam.name %></a>
-        <h1><%= participant.name %></h1>
+        <div>
+            <h1><%= participant.name %></h1>
+            <p class="page-subtitle">Запись участника</p>
+        </div>
     </div>
 
     <div class="card">
         <h2>Информация</h2>
         <dl class="kv">
-            <dt>Кадров записано:</dt><dd><%= frameCount %></dd>
-            <dt>Подключился:</dt><dd><%= new Date(participant.joined_at).toLocaleString('ru-RU') %></dd>
+            <dt>Кадров записано:</dt>
+            <dd><%= frameCount %></dd>
+            <dt>Подключился:</dt>
+            <dd><%= new Date(participant.joined_at).toLocaleString('ru-RU') %></dd>
             <% if (participant.last_seen_at) { %>
-                <dt>Последний кадр:</dt><dd><%= new Date(participant.last_seen_at).toLocaleString('ru-RU') %></dd>
+            <dt>Последний кадр:</dt>
+            <dd><%= new Date(participant.last_seen_at).toLocaleString('ru-RU') %></dd>
             <% } %>
             <dt>Статус видео:</dt>
             <dd>
                 <% if (recording && recording.status === 'done') { %>
-                    <span class="badge badge-active">готово</span>
-                    (<%= (recording.duration_ms / 1000).toFixed(1) %> сек,
-                    <%= (recording.size_bytes / 1024).toFixed(0) %> КБ)
-                <% } else if (recording && (recording.status === 'pending' || recording.status === 'running')) { %>
-                    <span class="badge badge-draft">конвертируется</span>
+                <span class="badge badge-active">готово</span>
+                (<%= (recording.duration_ms / 1000).toFixed(1) %> сек, <%= (recording.size_bytes /
+                1024).toFixed(0) %> КБ) <% } else if (recording && (recording.status === 'pending'
+                || recording.status === 'running')) { %>
+                <span class="badge badge-draft">конвертируется</span>
                 <% } else if (recording && recording.status === 'failed') { %>
-                    <span class="badge badge-finished">ошибка</span>
-                    <details style="margin-top:6px"><summary>Подробности</summary><pre><%= recording.error_message %></pre></details>
+                <span class="badge badge-finished">ошибка</span>
+                <details class="error-details">
+                    <summary>Подробности</summary>
+                    <pre><%= recording.error_message %></pre>
+                </details>
                 <% } else if (frameCount > 0) { %>
-                    <span class="muted">не сконвертировано (доступен покадровый просмотр)</span>
+                <span class="muted">не сконвертировано (доступен покадровый просмотр)</span>
                 <% } else { %>
-                    <span class="muted">кадров нет</span>
+                <span class="muted">кадров нет</span>
                 <% } %>
             </dd>
         </dl>
 
-        <div class="actions-row" style="margin-top:12px">
-            <% if (frameCount > 0 && (!recording || recording.status === 'failed' || recording.status === 'done')) { %>
-                <form method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/participants/<%= participant.id %>/convert">
-                    <button type="submit" class="btn btn-secondary">
-                        <%= recording && recording.status === 'done' ? 'Переконвертировать' : 'Сконвертировать в видео' %>
-                    </button>
-                </form>
+        <div class="actions-row section-actions">
+            <% if (frameCount > 0 && (!recording || recording.status === 'failed' ||
+            recording.status === 'done')) { %>
+            <form
+                method="post"
+                action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/convert"
+            >
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-secondary">
+                    <%= recording && recording.status === 'done' ? 'Переконвертировать' :
+                    'Сконвертировать в видео' %>
+                </button>
+            </form>
+            <% } %> <% if (recording && recording.status === 'done') { %>
+            <a class="btn" href="/admin/api/recordings/<%= recording.id %>/video?download=1">
+                Скачать видео
+            </a>
             <% } %>
-            <% if (recording && recording.status === 'done') { %>
-                <a class="btn" href="/admin/api/recordings/<%= recording.id %>/video?download=1">
-                    Скачать видео
-                </a>
-            <% } %>
-            <form method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/participants/<%= participant.id %>/delete" style="display:inline" onsubmit="return confirm('Удалить участника и все его записи? Действие необратимо.');">
+            <form
+                method="post"
+                action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/delete"
+                onsubmit="return confirm('Удалить участника и все его записи? Действие необратимо.');"
+            >
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                 <button type="submit" class="btn btn-danger">Удалить участника</button>
             </form>
         </div>
     </div>
 
     <% if (recording && recording.status === 'done') { %>
-        <div class="card player-card">
-            <div class="player-wrap">
-                <video id="player" controls preload="metadata" playsinline>
-                    <source src="/admin/api/recordings/<%= recording.id %>/video" type="video/<%= recording.format %>">
-                    Видео не поддерживается этим браузером.
-                </video>
-            </div>
-            <div class="player-controls">
-                <div class="speed-buttons" id="speeds"></div>
-                <div class="player-time">
-                    <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
-                </div>
-            </div>
-            <div class="timeline-wrap">
-                <svg class="timeline" id="timeline" viewBox="0 0 1000 40" preserveAspectRatio="none"></svg>
-                <div class="timeline-tooltip hidden" id="tl-tooltip"></div>
+    <div class="card player-card">
+        <div class="player-wrap">
+            <video id="player" controls preload="metadata" playsinline>
+                <source
+                    src="/admin/api/recordings/<%= recording.id %>/video"
+                    type="video/<%= recording.format %>"
+                />
+                Видео не поддерживается этим браузером.
+            </video>
+        </div>
+        <div class="player-controls">
+            <div class="speed-buttons" id="speeds"></div>
+            <div class="player-time">
+                <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
             </div>
         </div>
+        <div class="timeline-wrap">
+            <svg
+                class="timeline"
+                id="timeline"
+                viewBox="0 0 1000 40"
+                preserveAspectRatio="none"
+            ></svg>
+            <div class="timeline-tooltip hidden" id="tl-tooltip"></div>
+        </div>
+    </div>
 
-        <script>
-            window.__PLAYER__ = {
-                mode: 'video',
-                videoUrl: '/admin/api/recordings/<%= recording.id %>/video',
-                timelineUrl: '/admin/api/recordings/<%= recording.id %>/timeline'
-            };
-        </script>
-        <script src="/js/player.js"></script>
+    <script>
+        window.__PLAYER__ = {
+            mode: 'video',
+            videoUrl: '/admin/api/recordings/<%= recording.id %>/video',
+            timelineUrl: '/admin/api/recordings/<%= recording.id %>/timeline',
+        };
+    </script>
+    <script src="/js/player.js"></script>
 
     <% } else if (frameCount > 0) { %>
-        <div class="card player-card">
-            <p class="muted">Видео ещё не готово. Покадровый просмотр доступен ниже.</p>
-            <div class="player-wrap"><img id="slideshow-img" alt="кадр"></div>
-            <div class="player-controls">
-                <button class="btn btn-secondary btn-sm" id="play-pause">▶ Воспроизвести</button>
-                <div class="speed-buttons" id="speeds"></div>
-                <div class="player-time">
-                    <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
-                </div>
-            </div>
-            <div class="timeline-wrap">
-                <svg class="timeline" id="timeline" viewBox="0 0 1000 40" preserveAspectRatio="none"></svg>
-                <div class="timeline-tooltip hidden" id="tl-tooltip"></div>
+    <div class="card player-card">
+        <p class="muted player-note">Видео ещё не готово. Покадровый просмотр доступен ниже.</p>
+        <div class="player-wrap"><img id="slideshow-img" alt="кадр" /></div>
+        <div class="player-controls">
+            <button class="btn btn-secondary btn-sm" id="play-pause">Воспроизвести</button>
+            <div class="speed-buttons" id="speeds"></div>
+            <div class="player-time">
+                <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
             </div>
         </div>
+        <div class="timeline-wrap">
+            <svg
+                class="timeline"
+                id="timeline"
+                viewBox="0 0 1000 40"
+                preserveAspectRatio="none"
+            ></svg>
+            <div class="timeline-tooltip hidden" id="tl-tooltip"></div>
+        </div>
+    </div>
 
-        <script>
-            window.__PLAYER__ = {
-                mode: 'slideshow',
-                framesUrl: '/admin/api/participants/<%= participant.id %>/frames',
-                frameUrlBase: '/admin/api/frames/'
-            };
-        </script>
-        <script src="/js/player.js"></script>
+    <script>
+        window.__PLAYER__ = {
+            mode: 'slideshow',
+            framesUrl: '/admin/api/participants/<%= participant.id %>/frames',
+            frameUrlBase: '/admin/api/frames/',
+        };
+    </script>
+    <script src="/js/player.js"></script>
     <% } %>
 </div>

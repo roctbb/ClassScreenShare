@@ -3,95 +3,127 @@
         <a class="back-link" href="/admin">← К списку экзаменов</a>
         <h1><%= exam.name %></h1>
         <span class="badge badge-<%= exam.status %>">
-            <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ? 'активен' : 'завершён') %>
+            <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ? 'активен' :
+            'завершён') %>
         </span>
     </div>
 
     <% if (renamed) { %>
-        <div class="alert alert-success">Название обновлено.</div>
+    <div class="alert alert-success">Название обновлено.</div>
     <% } %>
 
     <div class="grid-2">
         <div class="card">
             <h2>Подключение участников</h2>
-            <p class="muted">Раздайте ссылку участникам экзамена. Каждый сможет подключиться по этой ссылке, ввести имя и начать делиться экраном.</p>
-            <p>
-                <strong>Код:</strong> <code class="code-pill"><%= exam.code %></code>
+            <p class="muted">
+                Раздайте ссылку участникам экзамена. Каждый сможет подключиться по этой ссылке,
+                ввести имя и начать делиться экраном.
             </p>
+            <p><strong>Код:</strong> <code class="code-pill"><%= exam.code %></code></p>
             <p>
                 <strong>Ссылка:</strong>
-                <input type="text" id="invite-link" value="<%= inviteUrl %>" readonly onclick="this.select()">
+                <input
+                    type="text"
+                    id="invite-link"
+                    value="<%= inviteUrl %>"
+                    readonly
+                    onclick="this.select()"
+                />
             </p>
-            <button class="btn btn-secondary btn-sm" type="button" onclick="copyInvite()">Скопировать ссылку</button>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="copyInvite()">
+                Скопировать ссылку
+            </button>
         </div>
 
         <div class="card">
             <h2>Параметры</h2>
             <dl class="kv">
-                <dt>Интервал кадра:</dt><dd><%= exam.capture_interval %> мс</dd>
-                <dt>Качество:</dt><dd><%= exam.image_quality %></dd>
-                <dt>Ширина:</dt><dd><%= exam.image_width %> px</dd>
-                <dt>Создан:</dt><dd><%= new Date(exam.created_at).toLocaleString('ru-RU') %></dd>
+                <dt>Интервал кадра:</dt>
+                <dd><%= exam.capture_interval %> мс</dd>
+                <dt>Качество:</dt>
+                <dd><%= exam.image_quality %></dd>
+                <dt>Ширина:</dt>
+                <dd><%= exam.image_width %> px</dd>
+                <dt>Создан:</dt>
+                <dd><%= new Date(exam.created_at).toLocaleString('ru-RU') %></dd>
                 <% if (exam.started_at) { %>
-                    <dt>Запущен:</dt><dd><%= new Date(exam.started_at).toLocaleString('ru-RU') %></dd>
-                <% } %>
-                <% if (exam.finished_at) { %>
-                    <dt>Завершён:</dt><dd><%= new Date(exam.finished_at).toLocaleString('ru-RU') %></dd>
+                <dt>Запущен:</dt>
+                <dd><%= new Date(exam.started_at).toLocaleString('ru-RU') %></dd>
+                <% } %> <% if (exam.finished_at) { %>
+                <dt>Завершён:</dt>
+                <dd><%= new Date(exam.finished_at).toLocaleString('ru-RU') %></dd>
                 <% } %>
             </dl>
         </div>
     </div>
 
-    <div class="card">
+    <div class="card actions-card">
         <h2>Действия</h2>
         <div class="actions-row">
             <% if (exam.status !== 'finished') { %>
-                <a class="btn" href="/admin/exams/<%= exam.id %>/live">Live-мониторинг</a>
+            <a class="btn" href="/admin/exams/<%= exam.id %>/live">Live-мониторинг</a>
+            <% } %> <% if (exam.status === 'draft') { %>
+            <form method="post" action="/admin/exams/<%= exam.id %>/activate">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-success">Запустить экзамен</button>
+            </form>
+            <% } %> <% if (exam.status === 'active') { %>
+            <form
+                method="post"
+                action="/admin/exams/<%= exam.id %>/finish"
+                onsubmit="return confirm('Завершить экзамен? После этого новые участники не смогут подключиться.');"
+            >
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-secondary">Завершить экзамен</button>
+            </form>
+            <% } %> <% if (exam.status === 'finished') { %>
+            <form method="post" action="/admin/exams/<%= exam.id %>/convert-all">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-secondary">Конвертировать все записи</button>
+            </form>
             <% } %>
 
-            <% if (exam.status === 'draft') { %>
-                <form method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/activate" style="display:inline">
-                    <button type="submit" class="btn btn-success">Запустить экзамен</button>
-                </form>
-            <% } %>
-
-            <% if (exam.status === 'active') { %>
-                <form method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/finish" style="display:inline" onsubmit="return confirm('Завершить экзамен? После этого новые участники не смогут подключиться.');">
-                    <button type="submit" class="btn btn-secondary">Завершить экзамен</button>
-                </form>
-            <% } %>
-
-            <% if (exam.status === 'finished') { %>
-                <form method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/convert-all" style="display:inline">
-                    <button type="submit" class="btn btn-secondary">Конвертировать все записи</button>
-                </form>
-            <% } %>
-
-            <button class="btn btn-secondary" type="button" onclick="document.getElementById('rename-form').classList.toggle('hidden')">
+            <button
+                class="btn btn-secondary"
+                type="button"
+                onclick="document.getElementById('rename-form').classList.toggle('hidden')"
+            >
                 Переименовать
             </button>
 
-            <form method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/delete" style="display:inline" onsubmit="return confirm('Удалить экзамен и все его записи? Это необратимо.');">
+            <form
+                method="post"
+                action="/admin/exams/<%= exam.id %>/delete"
+                onsubmit="return confirm('Удалить экзамен и все его записи? Это необратимо.');"
+            >
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                 <button type="submit" class="btn btn-danger">Удалить</button>
             </form>
         </div>
 
-        <form id="rename-form" method="post" action="/admin/exams/<%= exam.id %>
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">/rename" class="inline-form hidden" style="margin-top:12px">
-            <input type="text" name="name" value="<%= exam.name %>" required maxlength="255">
+        <form
+            id="rename-form"
+            method="post"
+            action="/admin/exams/<%= exam.id %>/rename"
+            class="inline-form hidden rename-form"
+        >
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <input type="text" name="name" value="<%= exam.name %>" required maxlength="255" />
             <button type="submit" class="btn btn-sm">Сохранить</button>
         </form>
     </div>
 
     <div class="card">
-        <h2>Участники <span class="muted">(<%= participants.length %>)</span> <a class="btn btn-sm btn-secondary" style="float:right" href="/admin/exams/<%= exam.id %>/participants.csv">Экспорт CSV</a></h2>
+        <div class="card-heading">
+            <h2>Участники <span class="muted">(<%= participants.length %>)</span></h2>
+            <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>/participants.csv">
+                Экспорт CSV
+            </a>
+        </div>
         <% if (participants.length === 0) { %>
-            <p class="muted">Пока никто не присоединился.</p>
+        <p class="muted">Пока никто не присоединился.</p>
         <% } else { %>
+        <div class="table-shell">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -105,53 +137,65 @@
                 </thead>
                 <tbody>
                     <% participants.forEach(p => { %>
-                        <tr data-pid="<%= p.id %>">
-                            <td><%= p.name %></td>
-                            <td><%= p.frameCount || 0 %></td>
-                            <td class="muted"><%= new Date(p.joined_at).toLocaleString('ru-RU') %></td>
-                            <td class="muted">
-                                <% if (p.lastFrameTs) { %>
-                                    <%= new Date(Number(p.lastFrameTs)).toLocaleString('ru-RU') %>
-                                <% } else { %>—<% } %>
-                            </td>
-                            <td class="rec-status">
-                                <% if (p.recording && p.recording.status === 'done') { %>
-                                    <span class="badge badge-active">видео готово</span>
-                                <% } else if (p.recording && (p.recording.status === 'pending' || p.recording.status === 'running')) { %>
-                                    <span class="badge badge-draft">конвертируется…</span>
-                                <% } else if (p.recording && p.recording.status === 'failed') { %>
-                                    <span class="badge badge-finished">ошибка</span>
-                                <% } else { %>
-                                    <span class="muted">—</span>
+                    <tr data-pid="<%= p.id %>">
+                        <td><%= p.name %></td>
+                        <td><%= p.frameCount || 0 %></td>
+                        <td class="muted"><%= new Date(p.joined_at).toLocaleString('ru-RU') %></td>
+                        <td class="muted">
+                            <% if (p.lastFrameTs) { %> <%= new
+                            Date(Number(p.lastFrameTs)).toLocaleString('ru-RU') %> <% } else { %>—<%
+                            } %>
+                        </td>
+                        <td class="rec-status">
+                            <% if (p.recording && p.recording.status === 'done') { %>
+                            <span class="badge badge-active">видео готово</span>
+                            <% } else if (p.recording && (p.recording.status === 'pending' ||
+                            p.recording.status === 'running')) { %>
+                            <span class="badge badge-draft">конвертируется…</span>
+                            <% } else if (p.recording && p.recording.status === 'failed') { %>
+                            <span class="badge badge-finished">ошибка</span>
+                            <% } else { %>
+                            <span class="muted">—</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <span class="rec-action">
+                                <% if ((p.frameCount || 0) > 0 && (!p.recording ||
+                                p.recording.status === 'failed' || p.recording.status === 'done')) {
+                                %>
+                                <form
+                                    method="post"
+                                    action="/admin/exams/<%= exam.id %>/participants/<%= p.id %>/convert"
+                                >
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                                    <button type="submit" class="btn btn-sm btn-secondary">
+                                        <%= p.recording && p.recording.status === 'done' ?
+                                        'Переконв.' : 'В видео' %>
+                                    </button>
+                                </form>
                                 <% } %>
-                            </td>
-                            <td>
-                                <span class="rec-action">
-                                <% if ((p.frameCount || 0) > 0 && (!p.recording || p.recording.status === 'failed' || p.recording.status === 'done')) { %>
-                                    <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= p.id %>/convert" style="display:inline">
-                                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                                        <button type="submit" class="btn btn-sm btn-secondary">
-                                            <%= p.recording && p.recording.status === 'done' ? 'Переконв.' : 'В видео' %>
-                                        </button>
-                                    </form>
-                                <% } %>
-                                </span>
-                                <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>/participants/<%= p.id %>">Открыть</a>
-                            </td>
-                        </tr>
+                            </span>
+                            <a
+                                class="btn btn-sm btn-secondary"
+                                href="/admin/exams/<%= exam.id %>/participants/<%= p.id %>"
+                                >Открыть</a
+                            >
+                        </td>
+                    </tr>
                     <% }) %>
                 </tbody>
             </table>
+        </div>
         <% } %>
     </div>
 </div>
 
 <script>
-function copyInvite() {
-    const el = document.getElementById('invite-link');
-    el.select();
-    document.execCommand('copy');
-}
+    function copyInvite() {
+        const el = document.getElementById('invite-link');
+        el.select();
+        document.execCommand('copy');
+    }
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script>

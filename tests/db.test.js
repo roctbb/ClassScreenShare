@@ -45,8 +45,28 @@ describe('exams service', () => {
         expect(exam.captureInterval).toBeGreaterThan(0);
     });
 
+    it('creates an exam with manual normalized code', async () => {
+        const exam = await examsService.createExam({ name: 'Алгебра', code: ' math-9 ' });
+        expect(exam.code).toBe('MATH-9');
+    });
+
+    it('rejects duplicate manual code', async () => {
+        await examsService.createExam({ name: 'Алгебра', code: 'MATH-9' });
+        await expect(
+            examsService.createExam({ name: 'Геометрия', code: 'math-9' })
+        ).rejects.toMatchObject({ status: 409 });
+    });
+
     it('rejects empty name', async () => {
         await expect(examsService.createExam({ name: '   ' })).rejects.toMatchObject({
+            status: 400,
+        });
+    });
+
+    it('rejects invalid manual code', async () => {
+        await expect(
+            examsService.createExam({ name: 'Test', code: 'no/slash' })
+        ).rejects.toMatchObject({
             status: 400,
         });
     });

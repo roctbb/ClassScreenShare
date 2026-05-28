@@ -23,6 +23,7 @@ function attachRenderer(app) {
                     {
                         title: ctx.title || 'ClassScreenShare',
                         user: ctx.user || res.locals.user || null,
+                        hideNav: Boolean(ctx.hideNav),
                         scripts: ctx.scripts || '',
                         headExtra: ctx.headExtra || '',
                         body,

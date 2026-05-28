@@ -1,64 +1,98 @@
 <div class="page">
     <div class="page-header">
-        <h1>Экзамены</h1>
+        <div>
+            <h1>Экзамены</h1>
+            <p class="page-subtitle">
+                Создавайте экзамены, управляйте кодами и открывайте мониторинг.
+            </p>
+        </div>
     </div>
 
-    <div class="card">
-        <h2>Создать экзамен</h2>
+    <div class="card create-exam-card">
+        <div class="card-heading">
+            <h2>Создать экзамен</h2>
+            <span class="muted">Код можно оставить пустым.</span>
+        </div>
         <% if (createError === 'empty') { %>
         <div class="alert alert-error">Введите название экзамена.</div>
         <% } else if (createError === 'invalid') { %>
         <div class="alert alert-error">Некорректное название.</div>
+        <% } else if (createError === 'bad_code') { %>
+        <div class="alert alert-error">
+            Код должен быть от 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание.
+        </div>
+        <% } else if (createError === 'code_exists') { %>
+        <div class="alert alert-error">Экзамен с таким кодом уже существует.</div>
         <% } %>
-        <form method="post" action="/admin/exams" class="inline-form">
+        <form method="post" action="/admin/exams" class="create-exam-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <input
-                type="text"
-                name="name"
-                placeholder="Название экзамена"
-                required
-                maxlength="255"
-                autofocus
-            />
-            <button type="submit" class="btn">Создать</button>
+            <div class="form-field form-field-grow">
+                <label for="exam-name">Название</label>
+                <input
+                    id="exam-name"
+                    type="text"
+                    name="name"
+                    placeholder="Например: Алгебра, 9 класс"
+                    required
+                    maxlength="255"
+                    autofocus
+                />
+            </div>
+            <div class="form-field form-field-code">
+                <label for="exam-code">Код</label>
+                <input
+                    id="exam-code"
+                    type="text"
+                    name="code"
+                    placeholder="MATH-9"
+                    maxlength="16"
+                    pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,15}"
+                    title="От 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание"
+                />
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Создать</button>
+            </div>
         </form>
     </div>
 
     <% if (exams.length === 0) { %>
     <div class="card muted">Пока ни одного экзамена нет.</div>
     <% } else { %>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Название</th>
-                <th>Код</th>
-                <th>Статус</th>
-                <th>Участников</th>
-                <th>Создан</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            <% exams.forEach(exam => { %>
-            <tr>
-                <td><a href="/admin/exams/<%= exam.id %>"><%= exam.name %></a></td>
-                <td><code><%= exam.code %></code></td>
-                <td>
-                    <span class="badge badge-<%= exam.status %>">
-                        <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ?
-                        'активен' : 'завершён') %>
-                    </span>
-                </td>
-                <td><%= exam.participantCount || 0 %></td>
-                <td class="muted"><%= new Date(exam.created_at).toLocaleString('ru-RU') %></td>
-                <td>
-                    <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>"
-                        >Открыть</a
-                    >
-                </td>
-            </tr>
-            <% }) %>
-        </tbody>
-    </table>
+    <div class="table-shell">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Код</th>
+                    <th>Статус</th>
+                    <th>Участников</th>
+                    <th>Создан</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <% exams.forEach(exam => { %>
+                <tr>
+                    <td><a href="/admin/exams/<%= exam.id %>"><%= exam.name %></a></td>
+                    <td><code><%= exam.code %></code></td>
+                    <td>
+                        <span class="badge badge-<%= exam.status %>">
+                            <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ?
+                            'активен' : 'завершён') %>
+                        </span>
+                    </td>
+                    <td><%= exam.participantCount || 0 %></td>
+                    <td class="muted"><%= new Date(exam.created_at).toLocaleString('ru-RU') %></td>
+                    <td class="table-actions">
+                        <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>"
+                            >Открыть</a
+                        >
+                    </td>
+                </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
     <% } %>
 </div>

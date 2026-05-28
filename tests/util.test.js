@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { generateCode, safeNext, CODE_ALPHABET, CODE_LENGTH } from '../src/lib/util.js';
+import {
+    generateCode,
+    normalizeExamCode,
+    safeNext,
+    CODE_ALPHABET,
+    CODE_LENGTH,
+} from '../src/lib/util.js';
 
 describe('generateCode', () => {
     it('returns string of expected length by default', () => {
@@ -65,5 +71,26 @@ describe('safeNext', () => {
     it('rejects non-strings', () => {
         expect(safeNext(42)).toBe('/admin');
         expect(safeNext({ url: '/admin' })).toBe('/admin');
+    });
+});
+
+describe('normalizeExamCode', () => {
+    it('trims and uppercases manual codes', () => {
+        expect(normalizeExamCode(' math-9 ')).toBe('MATH-9');
+    });
+
+    it('allows underscores and digits', () => {
+        expect(normalizeExamCode('exam_101')).toBe('EXAM_101');
+    });
+
+    it('returns empty string for empty input', () => {
+        expect(normalizeExamCode('')).toBe('');
+        expect(normalizeExamCode(null)).toBe('');
+    });
+
+    it('rejects too short, too long, and unsafe codes', () => {
+        expect(() => normalizeExamCode('ab')).toThrow(/3..16/);
+        expect(() => normalizeExamCode('a'.repeat(17))).toThrow(/3..16/);
+        expect(() => normalizeExamCode('math/9')).toThrow(/3..16/);
     });
 });
