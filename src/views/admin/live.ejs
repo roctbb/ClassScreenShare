@@ -42,10 +42,10 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    window.__LIVE__ = {
-        examId: <%= exam.id %>,
-        inactivityTimeout: <%= inactivityTimeout %>,
-        captureInterval: <%= exam.captureInterval ?? exam.capture_interval %>
-    };
+    window.__LIVE__ = <%- JSON.stringify({
+        examId: exam.id,
+        inactivityTimeout,
+        captureInterval: exam.captureInterval ?? exam.capture_interval ?? 5000,
+    }) %>;
 </script>
 <script src="/js/live.js?v=<%= assetVersion %>"></script>
