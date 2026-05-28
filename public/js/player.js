@@ -140,6 +140,11 @@
     function buildClientTimeline(frames) {
         const maxGapMs = (cfg.maxGapSeconds || 5) * 1000;
         const defaultDurationMs = 500; // 2fps
+        const expectedFrameIntervalMs = Number(
+            cfg.expectedFrameIntervalMs || cfg.captureInterval || 5000
+        );
+        const maxMissedFrames = Number(cfg.maxMissedFrames ?? 3);
+        const gapThresholdMs = expectedFrameIntervalMs * (maxMissedFrames + 1);
         const result = [];
         const gaps = [];
         let offset = 0;
@@ -149,8 +154,9 @@
             let d;
             if (next) {
                 const realGap = next.ts - cur.ts;
-                d = Math.min(realGap, maxGapMs);
-                if (realGap > maxGapMs) {
+                const isConnectionGap = realGap > gapThresholdMs;
+                d = isConnectionGap ? Math.min(realGap, maxGapMs) : realGap;
+                if (isConnectionGap) {
                     const gapStartMs = offset + Math.min(defaultDurationMs, d);
                     gaps.push({ startMs: gapStartMs, endMs: offset + d, realDurationMs: realGap });
                 }

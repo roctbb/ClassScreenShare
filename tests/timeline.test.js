@@ -40,6 +40,7 @@ describe('buildTimeline', () => {
         const r = buildTimeline(makeFrames([1000, 3000, 13000, 14000]), {
             fps: 2,
             maxGapSeconds: 3,
+            expectedFrameIntervalMs: 1000,
         });
         // Между [3000] и [13000] gap = 10s, ограничен до 3s.
         expect(r.frames[1].durationMs).toBe(3000);
@@ -55,6 +56,7 @@ describe('buildTimeline', () => {
         const r = buildTimeline(makeFrames([0, 1000, 100000, 101000, 200000]), {
             fps: 2,
             maxGapSeconds: 5,
+            expectedFrameIntervalMs: 1000,
         });
         // Два gap'а: [1000..100000] = 99s -> capped to 5s, [101000..200000] = 99s -> capped to 5s.
         expect(r.gaps).toHaveLength(2);
@@ -70,10 +72,24 @@ describe('buildTimeline', () => {
         expect(r.gaps[1].startMs).toBe(7500);
     });
 
-    it('does not record a "gap" when interval equals maxGap exactly', () => {
-        // Реальный gap 5000ms, capped до 5000ms — это не gap (нет потери качества).
-        const r = buildTimeline(makeFrames([0, 5000]), { fps: 2, maxGapSeconds: 5 });
+    it('does not record a gap when exactly three frames are missed', () => {
+        // При интервале 1250ms разрыв 5000ms означает ровно 3 пропущенных кадра.
+        const r = buildTimeline(makeFrames([0, 5000]), {
+            fps: 2,
+            maxGapSeconds: 5,
+            expectedFrameIntervalMs: 1250,
+        });
         expect(r.gaps).toEqual([]);
+        expect(r.frames[0].durationMs).toBe(5000);
+    });
+
+    it('records a gap only when more than three frames are missed', () => {
+        const r = buildTimeline(makeFrames([0, 5001]), {
+            fps: 2,
+            maxGapSeconds: 5,
+            expectedFrameIntervalMs: 1250,
+        });
+        expect(r.gaps).toHaveLength(1);
         expect(r.frames[0].durationMs).toBe(5000);
     });
 

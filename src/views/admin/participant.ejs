@@ -207,6 +207,8 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
             frameUrlBase: '/admin/api/frames/',
             examStartedAt: <%= exam.started_at ? new Date(exam.started_at).getTime() : 'null' %>,
             maxGapSeconds: <%= typeof maxGapSeconds !== 'undefined' ? maxGapSeconds : 5 %>,
+            expectedFrameIntervalMs: <%= exam.captureInterval ?? exam.capture_interval ?? 5000 %>,
+            maxMissedFrames: 3,
         };
     </script>
     <script src="/js/player.js?v=<%= assetVersion %>"></script>

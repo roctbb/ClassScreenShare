@@ -3,7 +3,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const { spawn } = require('child_process');
-const { Frame, Recording, Participant } = require('../db/models');
+const { Frame, Recording, Participant, Exam } = require('../db/models');
 const config = require('../config');
 const logger = require('../logger');
 const bus = require('./bus');
@@ -33,6 +33,11 @@ function buildTimeline(frames, options = {}) {
     const fps = options.fps || config.video.fps;
     const maxGapMs = (options.maxGapSeconds || config.video.maxGapSeconds) * 1000;
     const defaultDurationMs = Math.round(1000 / fps);
+    const expectedFrameIntervalMs = Number(
+        options.expectedFrameIntervalMs || options.captureInterval || config.capture.interval
+    );
+    const maxMissedFrames = Number(options.maxMissedFrames ?? 3);
+    const gapThresholdMs = expectedFrameIntervalMs * (maxMissedFrames + 1);
 
     const result = [];
     const gaps = [];
@@ -44,11 +49,12 @@ function buildTimeline(frames, options = {}) {
         let durationMs;
         if (next) {
             const realGap = Number(next.ts) - Number(cur.ts);
-            durationMs = Math.min(realGap, maxGapMs);
-            // Если реальный gap больше maxGapMs — это пропуск связи.
+            const isConnectionGap = realGap > gapThresholdMs;
+            durationMs = isConnectionGap ? Math.min(realGap, maxGapMs) : realGap;
+            // Если пропущено больше maxMissedFrames кадров — это пропуск связи.
             // Последний доставленный кадр всё равно показываем хотя бы один
             // обычный frame tick, а оставшуюся сжатую паузу помечаем как gap.
-            if (realGap > maxGapMs) {
+            if (isConnectionGap) {
                 const gapStartMs = videoOffsetMs + Math.min(defaultDurationMs, durationMs);
                 gaps.push({
                     startMs: gapStartMs,
@@ -161,7 +167,9 @@ function createProgressParser(onProgress) {
  * Идемпотентна: обновляет существующий Recording.
  */
 async function convertParticipant(participantId) {
-    const participant = await Participant.findByPk(participantId);
+    const participant = await Participant.findByPk(participantId, {
+        include: [{ model: Exam, as: 'exam', attributes: ['captureInterval'] }],
+    });
     if (!participant) {
         const err = new Error('participant not found');
         err.status = 404;
@@ -207,7 +215,10 @@ async function convertParticipant(participantId) {
         recordingId: recording.id,
     });
 
-    const timeline = buildTimeline(frames);
+    const timeline = buildTimeline(frames, {
+        expectedFrameIntervalMs:
+            participant.exam?.captureInterval ?? participant.exam?.capture_interval,
+    });
 
     // Готовим директорию для вывода.
     const participantDir = path.join(
@@ -238,6 +249,9 @@ async function convertParticipant(participantId) {
                 fps: config.video.fps,
                 format: config.video.format,
                 maxGapSeconds: config.video.maxGapSeconds,
+                expectedFrameIntervalMs:
+                    participant.exam?.captureInterval ?? participant.exam?.capture_interval ?? null,
+                maxMissedFrames: 3,
                 totalDurationMs: timeline.totalDurationMs,
                 frameCount: timeline.frames.length,
                 firstFrameTs: timeline.frames[0].ts,
