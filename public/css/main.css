@@ -217,6 +217,7 @@ input[type='text'],
 input[type='password'],
 input[type='number'],
 input[type='search'],
+select,
 textarea {
     width: 100%;
     min-height: 40px;
@@ -228,6 +229,7 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
     outline: none;
     border-color: var(--accent);
@@ -755,6 +757,37 @@ label {
 
 .table-actions {
     white-space: nowrap;
+}
+
+.exam-list-toolbar {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) minmax(150px, auto) minmax(150px, auto);
+    gap: 12px;
+    align-items: end;
+    margin: 16px 0 12px;
+}
+
+.exam-search,
+.exam-filter {
+    min-width: 0;
+}
+
+.exam-filter label {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.exam-list-summary {
+    grid-column: 1 / -1;
+    margin: -2px 0 0;
+    font-size: 13px;
+}
+
+@media (max-width: 760px) {
+    .exam-list-toolbar {
+        grid-template-columns: 1fr;
+    }
 }
 
 .connection-log-shell {

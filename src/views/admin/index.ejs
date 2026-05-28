@@ -66,6 +66,35 @@
     <% if (exams.length === 0) { %>
     <div class="card muted">Пока ни одного экзамена нет.</div>
     <% } else { %>
+    <div class="exam-list-toolbar" aria-label="Фильтр списка экзаменов">
+        <div class="exam-search">
+            <label class="sr-only" for="exam-search-input">Найти экзамен</label>
+            <input
+                id="exam-search-input"
+                type="search"
+                placeholder="Найти по названию или коду"
+                autocomplete="off"
+            />
+        </div>
+        <div class="exam-filter">
+            <label for="exam-status-filter">Статус</label>
+            <select id="exam-status-filter">
+                <option value="all">Все</option>
+                <option value="draft">Черновики</option>
+                <option value="active">Активные</option>
+                <option value="finished">Завершённые</option>
+            </select>
+        </div>
+        <div class="exam-filter">
+            <label for="exam-auth-filter">Вход</label>
+            <select id="exam-auth-filter">
+                <option value="all">Любой</option>
+                <option value="geekclass">GeekClass</option>
+                <option value="manual">Имя вручную</option>
+            </select>
+        </div>
+        <p class="exam-list-summary muted" id="exam-list-summary">Показаны все экзамены.</p>
+    </div>
     <div class="table-shell">
         <table class="data-table">
             <thead>
@@ -81,7 +110,13 @@
             </thead>
             <tbody>
                 <% exams.forEach(exam => { %>
-                <tr>
+                <tr
+                    data-exam-row
+                    data-name="<%= exam.name %>"
+                    data-code="<%= exam.code %>"
+                    data-status="<%= exam.status %>"
+                    data-auth="<%= exam.require_geekclass ? 'geekclass' : 'manual' %>"
+                >
                     <td><a href="/admin/exams/<%= exam.id %>"><%= exam.name %></a></td>
                     <td><code><%= exam.code %></code></td>
                     <td class="muted"><%= exam.require_geekclass ? 'GeekClass' : 'любой' %></td>
@@ -100,8 +135,12 @@
                     </td>
                 </tr>
                 <% }) %>
+                <tr class="hidden" id="exam-list-empty">
+                    <td class="muted" colspan="7">По этим фильтрам экзамены не найдены.</td>
+                </tr>
             </tbody>
         </table>
     </div>
     <% } %>
 </div>
+<script src="/js/admin-index.js?v=<%= assetVersion %>"></script>
