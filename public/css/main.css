@@ -624,10 +624,16 @@ label {
 .participant-top-strip {
     position: relative;
     display: grid;
-    grid-template-columns: 34px minmax(210px, 0.7fr) minmax(460px, 1.5fr) auto;
+    grid-template-columns: 34px minmax(220px, 0.75fr) minmax(520px, 1.7fr) auto;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    min-height: 46px;
     margin-bottom: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
 }
 
 .participant-back-link {
@@ -637,24 +643,37 @@ label {
     justify-content: center;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--card);
+    background: var(--surface-muted);
 }
 
 .participant-title h1 {
     margin: 0;
-    font-size: 22px;
+    overflow: hidden;
+    font-size: 20px;
     line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.participant-title {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 10px;
 }
 
 .participant-title .page-subtitle {
-    margin-top: 2px;
+    margin: 0;
     font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .participant-compact-metrics {
     display: flex;
-    align-items: stretch;
-    gap: 8px;
+    align-items: center;
+    gap: 0;
     min-width: 0;
 }
 
@@ -663,11 +682,9 @@ label {
     min-width: 0;
     align-items: center;
     gap: 7px;
-    padding: 7px 9px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--card);
-    box-shadow: var(--shadow-sm);
+    min-height: 34px;
+    padding: 0 12px;
+    border-right: 1px solid var(--border);
     font-size: 13px;
     white-space: nowrap;
 }
@@ -685,16 +702,17 @@ label {
 .participant-connection-details {
     position: relative;
     min-width: 0;
+    margin-left: 10px;
     padding: 0;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--card);
-    box-shadow: var(--shadow-sm);
+    background: var(--surface-muted);
 }
 
 .participant-connection-details .connection-log-summary {
     min-height: 32px;
-    padding: 6px 9px;
+    padding: 5px 9px;
+    font-size: 13px;
 }
 
 .participant-connection-dropdown {
@@ -716,7 +734,7 @@ label {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
 }
 
 .copy-feedback {
@@ -743,6 +761,18 @@ label {
     .participant-compact-metrics {
         grid-column: 1 / -1;
         flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .participant-metric {
+        border-right: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface-muted);
+    }
+
+    .participant-connection-details {
+        margin-left: 0;
     }
 }
 
@@ -1378,7 +1408,9 @@ label {
 .participant-page .player-card {
     width: calc(100vw - 24px);
     margin-left: 50%;
+    margin-bottom: 0;
     transform: translateX(-50%);
+    border-radius: 8px;
 }
 
 .player-note {
@@ -1396,7 +1428,7 @@ label {
 }
 
 .participant-page .player-wrap {
-    min-height: calc(100vh - 230px);
+    min-height: calc(100vh - 198px);
 }
 
 .player-wrap video,
@@ -1409,7 +1441,7 @@ label {
 
 .participant-page .player-wrap video,
 .participant-page .player-wrap img {
-    max-height: calc(100vh - 230px);
+    max-height: calc(100vh - 198px);
 }
 
 @media (max-width: 760px) {
@@ -1429,8 +1461,9 @@ label {
 .player-controls {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
+    gap: 12px;
+    min-height: 52px;
+    padding: 10px 14px;
     border-top: 1px solid var(--border);
     flex-wrap: wrap;
 }
@@ -1460,7 +1493,7 @@ label {
 
 .timeline-wrap {
     position: relative;
-    padding: 0 16px 16px 16px;
+    padding: 0 14px 14px;
 }
 
 .timeline {
