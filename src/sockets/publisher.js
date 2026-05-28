@@ -4,6 +4,7 @@ const cookie = require('cookie');
 const { Participant, Exam } = require('../db/models');
 const framesService = require('../services/frames');
 const participantsService = require('../services/participants');
+const participantConnectionsService = require('../services/participantConnections');
 const bus = require('../services/bus');
 const config = require('../config');
 const logger = require('../logger');
@@ -33,6 +34,7 @@ function attachPublisher(io) {
             .fetchSockets()
             .then((sockets) => {
                 for (const s of sockets) {
+                    s.data.disconnectReason = 'exam_finished';
                     s.emit('kicked', { reason: 'exam_finished' });
                     s.disconnect(true);
                 }
@@ -70,7 +72,11 @@ function attachPublisher(io) {
     ns.on('connection', (socket) => {
         const { examId, participantId, participantName, captureInterval } = socket.data;
 
-        logger.info({ examId, participantId, name: participantName }, 'publisher connected');
+        logger.info(
+            { examId, participantId, name: participantName, socketId: socket.id },
+            'publisher connected'
+        );
+        participantConnectionsService.recordSocketEvent(socket, 'connect').catch(() => {});
         socket.join(`exam:${examId}`);
 
         bus.emit('join', {
@@ -120,6 +126,7 @@ function attachPublisher(io) {
         socket.on('leave', async () => {
             try {
                 await participantsService.leave(participantId);
+                socket.data.disconnectReason = 'student_leave';
             } catch (err) {
                 logger.warn({ err: err.message }, 'leave error');
             }
@@ -127,7 +134,14 @@ function attachPublisher(io) {
         });
 
         socket.on('disconnect', (reason) => {
-            logger.info({ examId, participantId, reason }, 'publisher disconnected');
+            const finalReason = socket.data.disconnectReason || reason;
+            logger.info(
+                { examId, participantId, reason: finalReason, socketId: socket.id },
+                'publisher disconnected'
+            );
+            participantConnectionsService
+                .recordSocketEvent(socket, 'disconnect', finalReason)
+                .catch(() => {});
             framesService.clearState(participantId);
             bus.emit('leave', { examId, participantId });
         });

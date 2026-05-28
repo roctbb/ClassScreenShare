@@ -221,6 +221,7 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const pathMod = require('path');
 const videoService = require('../services/video');
+const participantConnectionsService = require('../services/participantConnections');
 const { Participant, Frame, Recording } = require('../db/models');
 
 // Страница участника с плеером.
@@ -237,6 +238,7 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
         if (!exam) return next();
 
         const frameCount = await Frame.count({ where: { participantId: pid } });
+        const connectionLogs = await participantConnectionsService.listForParticipant(pid);
 
         res.renderPage('admin/participant', {
             title: `${participant.name} — ${exam.name}`,
@@ -244,6 +246,7 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
             participant: participant.toJSON(),
             recording: participant.recording ? participant.recording.toJSON() : null,
             frameCount,
+            connectionLogs: connectionLogs.map((log) => log.toJSON()),
         });
     } catch (err) {
         next(err);

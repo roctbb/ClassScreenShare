@@ -677,6 +677,19 @@ label {
     white-space: nowrap;
 }
 
+.connection-log-shell {
+    box-shadow: none;
+}
+
+.connection-log-table code {
+    white-space: nowrap;
+}
+
+.user-agent-cell {
+    max-width: 420px;
+    word-break: break-word;
+}
+
 /* ----- Exam (participant) page ----- */
 .exam-page {
     max-width: 720px;

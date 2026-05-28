@@ -10,7 +10,7 @@ process.env.LOG_LEVEL = 'error';
 const { sequelize, waitForDb } = await import('../src/db/index.js');
 const { runMigrations } = await import('../src/db/migrator.js');
 await import('../src/db/models/index.js');
-const { User, Participant } = await import('../src/db/models/index.js');
+const { User, Participant, ParticipantConnection } = await import('../src/db/models/index.js');
 const examsService = await import('../src/services/exams.js');
 const participantsService = await import('../src/services/participants.js');
 const usersService = await import('../src/services/users.js');
@@ -27,7 +27,7 @@ afterAll(async () => {
 beforeEach(async () => {
     // Чистим таблицы перед каждым тестом, чтобы изоляция была.
     await sequelize.query(
-        'TRUNCATE TABLE frames, recordings, participants, exams, users RESTART IDENTITY CASCADE'
+        'TRUNCATE TABLE frames, recordings, participant_connections, participants, exams, users RESTART IDENTITY CASCADE'
     );
 });
 
@@ -204,6 +204,31 @@ describe('participants service', () => {
             userAgent: longUa,
         });
         expect(participant.userAgent.length).toBeLessThanOrEqual(512);
+    });
+});
+
+describe('participant connection logs', () => {
+    it('stores socket connection events for a participant', async () => {
+        const exam = await examsService.createExam({ name: 'Test' });
+        const { participant } = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'Иван',
+        });
+
+        const event = await ParticipantConnection.create({
+            participantId: participant.id,
+            examId: exam.id,
+            socketId: 'socket-1',
+            event: 'connect',
+            ip: '127.0.0.1',
+            userAgent: 'test-agent',
+        });
+
+        expect(event.id).toBeTruthy();
+        const count = await ParticipantConnection.count({
+            where: { participantId: participant.id },
+        });
+        expect(count).toBe(1);
     });
 });
 

@@ -13,24 +13,29 @@
             <dt>Кадров записано:</dt>
             <dd><%= frameCount %></dd>
             <dt>Подключился:</dt>
-            <dd><%= new Date(participant.joined_at).toLocaleString('ru-RU') %></dd>
-            <% if (participant.last_seen_at) { %>
+            <dd>
+                <%= new Date(participant.joinedAt ?? participant.joined_at).toLocaleString('ru-RU')
+                %>
+            </dd>
+            <% const lastSeenAt = participant.lastSeenAt ?? participant.last_seen_at; %> <% if
+            (lastSeenAt) { %>
             <dt>Последний кадр:</dt>
-            <dd><%= new Date(participant.last_seen_at).toLocaleString('ru-RU') %></dd>
+            <dd><%= new Date(lastSeenAt).toLocaleString('ru-RU') %></dd>
             <% } %>
             <dt>Статус видео:</dt>
             <dd>
-                <% if (recording && recording.status === 'done') { %>
-                <span class="badge badge-active">готово</span>
-                (<%= (recording.duration_ms / 1000).toFixed(1) %> сек, <%= (recording.size_bytes /
-                1024).toFixed(0) %> КБ) <% } else if (recording && (recording.status === 'pending'
-                || recording.status === 'running')) { %>
+                <% if (recording && recording.status === 'done') { %> <% const durationMs =
+                recording.durationMs ?? recording.duration_ms; %> <% const sizeBytes =
+                recording.sizeBytes ?? recording.size_bytes; %>
+                <span class="badge badge-active">готово</span> (<%= (durationMs / 1000).toFixed(1)
+                %> сек, <%= (sizeBytes / 1024).toFixed(0) %> КБ) <% } else if (recording &&
+                (recording.status === 'pending' || recording.status === 'running')) { %>
                 <span class="badge badge-draft">конвертируется</span>
                 <% } else if (recording && recording.status === 'failed') { %>
                 <span class="badge badge-finished">ошибка</span>
                 <details class="error-details">
                     <summary>Подробности</summary>
-                    <pre><%= recording.error_message %></pre>
+                    <pre><%= recording.errorMessage ?? recording.error_message %></pre>
                 </details>
                 <% } else if (frameCount > 0) { %>
                 <span class="muted">не сконвертировано (доступен покадровый просмотр)</span>
@@ -67,6 +72,51 @@
                 <button type="submit" class="btn btn-danger">Удалить участника</button>
             </form>
         </div>
+    </div>
+
+    <div class="card">
+        <h2>Лог подключений</h2>
+        <% if (!connectionLogs || connectionLogs.length === 0) { %>
+        <p class="muted">Пока нет событий подключения.</p>
+        <% } else { %>
+        <div class="table-shell connection-log-shell">
+            <table class="data-table connection-log-table">
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Событие</th>
+                        <th>Socket</th>
+                        <th>IP</th>
+                        <th>Причина</th>
+                        <th>User-Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% connectionLogs.forEach(event => { %>
+                    <tr>
+                        <td class="muted">
+                            <%= new Date(event.createdAt ??
+                            event.created_at).toLocaleString('ru-RU') %>
+                        </td>
+                        <td>
+                            <% if (event.event === 'connect') { %>
+                            <span class="badge badge-active">подключился</span>
+                            <% } else { %>
+                            <span class="badge badge-finished">отключился</span>
+                            <% } %>
+                        </td>
+                        <td><code><%= event.socketId ?? event.socket_id %></code></td>
+                        <td><%= event.ip || '—' %></td>
+                        <td class="muted"><%= event.reason || '—' %></td>
+                        <td class="muted user-agent-cell">
+                            <%= event.userAgent ?? event.user_agent ?? '—' %>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+        <% } %>
     </div>
 
     <% if (recording && recording.status === 'done') { %>
