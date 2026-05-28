@@ -18,6 +18,14 @@
         <button class="btn btn-secondary btn-sm" type="button" id="mute-btn">Включить звук</button>
     </header>
 
+    <div class="live-toolbar">
+        <div class="segmented live-filters" role="group" aria-label="Фильтр участников">
+            <button class="active" type="button" data-live-filter="all">Все</button>
+            <button type="button" data-live-filter="active">Активные</button>
+            <button type="button" data-live-filter="problem">Проблемы</button>
+        </div>
+    </div>
+
     <div class="live-body">
         <div class="live-grid" id="grid">
             <% if (participants.length === 0) { %>

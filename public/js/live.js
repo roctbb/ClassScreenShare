@@ -15,6 +15,7 @@
     const connStatus = $('conn-status');
     const connText = $('conn-text');
     const muteBtn = $('mute-btn');
+    const filterButtons = Array.from(document.querySelectorAll('[data-live-filter]'));
 
     const cards = new Map(); // pid -> DOMElement
     const connected = new Set(); // pids с активным publisher-сокетом
@@ -26,6 +27,7 @@
     let audioCtx = null;
     let beepTimer = null;
     let fullscreenPid = null;
+    let currentFilter = 'all';
 
     // ---------- Audio ----------
     function ensureAudio() {
@@ -177,11 +179,24 @@
         const currentEmptyState = document.getElementById('empty-state');
         if (currentEmptyState) currentEmptyState.remove();
     }
+    function removeFilterEmptyState() {
+        const currentFilterEmpty = document.getElementById('filter-empty-state');
+        if (currentFilterEmpty) currentFilterEmpty.remove();
+    }
     function showEmptyState(text) {
         if (document.getElementById('empty-state') || cards.size > 0) return;
+        removeFilterEmptyState();
         const div = document.createElement('div');
         div.className = 'live-empty muted';
         div.id = 'empty-state';
+        div.textContent = text;
+        grid.appendChild(div);
+    }
+    function showFilterEmptyState(text) {
+        if (document.getElementById('filter-empty-state') || cards.size === 0) return;
+        const div = document.createElement('div');
+        div.className = 'live-empty muted';
+        div.id = 'filter-empty-state';
         div.textContent = text;
         grid.appendChild(div);
     }
@@ -213,6 +228,7 @@
         refreshProblemCounts();
         refreshBeeping();
         refreshCount();
+        applyCardFilter();
     }
     function setCardImage(pid, dataUrl) {
         pid = Number(pid);
@@ -264,6 +280,7 @@
         }
         refreshProblemCounts();
         refreshBeeping();
+        applyCardFilter();
     }
 
     function toggleFullscreen(pid) {
@@ -293,6 +310,40 @@
         staleNum.textContent = String(stale.size);
         staleCount.classList.toggle('hidden', stale.size === 0);
     }
+    function isProblemParticipant(pid) {
+        return stale.has(pid) || !connected.has(pid);
+    }
+    function cardMatchesFilter(pid) {
+        if (currentFilter === 'active') return connected.has(pid);
+        if (currentFilter === 'problem') return isProblemParticipant(pid);
+        return true;
+    }
+    function filterEmptyText() {
+        if (currentFilter === 'active') return 'Нет активных участников в этом фильтре.';
+        if (currentFilter === 'problem') return 'Проблемных участников сейчас нет.';
+        return '';
+    }
+    function applyCardFilter() {
+        removeFilterEmptyState();
+        let visible = 0;
+        for (const [pid, card] of cards) {
+            const show = cardMatchesFilter(pid);
+            card.classList.toggle('filtered-hidden', !show);
+            if (show) visible++;
+        }
+        if (cards.size > 0 && visible === 0) {
+            showFilterEmptyState(filterEmptyText());
+        }
+    }
+    function setLiveFilter(filter) {
+        currentFilter = filter;
+        filterButtons.forEach((button) => {
+            const isActive = button.dataset.liveFilter === filter;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+        applyCardFilter();
+    }
 
     function hydrateInitialCards() {
         grid.querySelectorAll('.screen-card[data-pid]').forEach((card) => {
@@ -309,7 +360,13 @@
             connected.add(pid);
         });
         refreshCount();
+        applyCardFilter();
     }
+
+    filterButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
+        button.addEventListener('click', () => setLiveFilter(button.dataset.liveFilter || 'all'));
+    });
 
     // Каждую секунду обновляем "X сек назад".
     setInterval(() => {
@@ -349,6 +406,7 @@
             });
             if (cards.size === 0) showEmptyState('Ожидание участников.');
             refreshCount();
+            applyCardFilter();
         });
     });
     socket.on('disconnect', () => {
@@ -377,6 +435,7 @@
         ensureCard(pid, name);
         setCardConnected(pid, true);
         refreshCount();
+        applyCardFilter();
         logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
     });
     socket.on('participant:leave', ({ participantId }) => {

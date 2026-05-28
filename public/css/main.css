@@ -836,6 +836,43 @@ label {
     font-size: 14px;
 }
 
+.live-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin: -4px 0 14px;
+}
+
+.segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #f9fafb;
+}
+
+.segmented button {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.segmented button:hover {
+    color: var(--text);
+    background: #eef2ff;
+}
+
+.segmented button.active {
+    color: #fff;
+    background: var(--accent);
+}
+
 .live-body {
     display: grid;
     grid-template-columns: 1fr 280px;
@@ -877,6 +914,10 @@ label {
     aspect-ratio: 16 / 10;
     display: flex;
     flex-direction: column;
+}
+
+.screen-card.filtered-hidden {
+    display: none;
 }
 
 .screen-card:hover {
