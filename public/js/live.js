@@ -18,6 +18,7 @@
     const filterButtons = Array.from(document.querySelectorAll('[data-live-filter]'));
     const liveSearchInput = $('live-search-input');
     const liveSearchClear = $('live-search-clear');
+    const liveFilterSummary = $('live-filter-summary');
 
     const cards = new Map(); // pid -> DOMElement
     const connected = new Set(); // pids с активным publisher-сокетом
@@ -128,6 +129,8 @@
 
     // ---------- Log ----------
     function logEvent(html, klass) {
+        const emptyLog = $('log-empty');
+        if (emptyLog) emptyLog.remove();
         const li = document.createElement('li');
         li.className = klass || '';
         li.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString('ru-RU')}</span> ${html}`;
@@ -330,6 +333,20 @@
         if (currentFilter === 'problem') return 'Проблемных участников сейчас нет.';
         return '';
     }
+    function filterLabel() {
+        if (currentFilter === 'active') return 'активные';
+        if (currentFilter === 'problem') return 'проблемы';
+        return 'все';
+    }
+    function updateFilterSummary(visible) {
+        if (!liveFilterSummary) return;
+        if (cards.size === 0) {
+            liveFilterSummary.textContent = 'Участников пока нет.';
+            return;
+        }
+        const searchSuffix = searchQuery ? `, поиск: «${liveSearchInput.value.trim()}»` : '';
+        liveFilterSummary.textContent = `Показано ${visible} из ${cards.size}; фильтр: ${filterLabel()}${searchSuffix}.`;
+    }
     function applyCardFilter() {
         removeFilterEmptyState();
         let visible = 0;
@@ -341,6 +358,7 @@
         if (cards.size > 0 && visible === 0) {
             showFilterEmptyState(filterEmptyText());
         }
+        updateFilterSummary(visible);
     }
     function setLiveFilter(filter) {
         currentFilter = filter;

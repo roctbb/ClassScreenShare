@@ -838,11 +838,15 @@ label {
 .live-header h1 {
     margin: 0;
     font-size: 18px;
-    flex: 1;
     min-width: 200px;
 }
 
+.live-code {
+    font-size: 13px;
+}
+
 .live-stats {
+    margin-left: auto;
     display: flex;
     gap: 10px 16px;
     flex-wrap: wrap;
@@ -900,11 +904,23 @@ label {
     height: 38px;
 }
 
+.live-filter-summary {
+    margin: 0 0 0 auto;
+    font-size: 13px;
+}
+
 @media (max-width: 640px) {
     .live-toolbar,
     .live-search,
     .live-search input {
         width: 100%;
+    }
+}
+
+@media (max-width: 900px) {
+    .live-stats,
+    .live-filter-summary {
+        margin-left: 0;
     }
 }
 
@@ -1081,6 +1097,11 @@ label {
 }
 
 .live-log li:last-child {
+    border-bottom: none;
+}
+
+.live-log .log-empty {
+    color: var(--muted);
     border-bottom: none;
 }
 

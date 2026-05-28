@@ -2,6 +2,7 @@
     <header class="live-header">
         <a class="back-link" href="/admin/exams/<%= exam.id %>">← К экзамену</a>
         <h1>Live: <%= exam.name %></h1>
+        <span class="live-code code-pill"><%= exam.code %></span>
         <span id="conn-status" class="conn-status conn-disconnected">
             <span class="conn-dot"></span><span id="conn-text">Подключение…</span>
         </span>
@@ -36,6 +37,7 @@
                 Очистить
             </button>
         </div>
+        <p class="live-filter-summary muted" id="live-filter-summary">Показаны все участники.</p>
     </div>
 
     <div class="live-body">
@@ -60,7 +62,9 @@
 
         <aside class="live-log">
             <h3>Журнал</h3>
-            <ul id="log-list"></ul>
+            <ul id="log-list">
+                <li class="log-empty" id="log-empty">Событий пока нет.</li>
+            </ul>
         </aside>
     </div>
 </div>
