@@ -36,6 +36,14 @@ async function bootstrap() {
 
     const app = express();
 
+    // Доверяем заголовкам X-Forwarded-* от nginx/load-balancer.
+    // Без этого express-session с secure:true не выставит cookie, потому что
+    // соединение app<-nginx идёт по http, и req.secure=false.
+    // Значение 'loopback, linklocal, uniquelocal' разрешает доверять
+    // только локальным прокси (в Docker network нгинкс снаружи).
+    // Здесь проще всего поставить 1 (доверяем первому прокси).
+    app.set('trust proxy', 1);
+
     // helmet с относительно мягкой CSP, потому что у нас inline-скрипты в EJS
     // и socket.io клиент. Если нужно — ужесточу позже.
     app.use(
