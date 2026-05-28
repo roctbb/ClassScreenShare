@@ -5,7 +5,6 @@
     const cfg = window.__LIVE__;
     const $ = (id) => document.getElementById(id);
     const grid = $('grid');
-    const emptyState = $('empty-state');
     const logList = $('log-list');
     const liveCount = $('live-count');
     const staleNum = $('stale-num');
@@ -15,6 +14,7 @@
     const muteBtn = $('mute-btn');
 
     const cards = new Map(); // pid -> DOMElement
+    const connected = new Set(); // pids с активным publisher-сокетом
     const lastTs = new Map(); // pid -> ms
     const stale = new Set(); // pids считаются stale прямо сейчас
 
@@ -34,21 +34,31 @@
         }
     }
     function beep(freq) {
-        if (muted || !audioCtx) return;
-        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.type = 'sine';
-        o.frequency.value = freq || 660;
-        o.connect(g);
-        g.connect(audioCtx.destination);
-        const t = audioCtx.currentTime;
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.18, t + 0.02);
-        g.gain.setValueAtTime(0.18, t + 0.12);
-        g.gain.linearRampToValueAtTime(0, t + 0.18);
-        o.start(t);
-        o.stop(t + 0.2);
+        if (muted) return;
+        ensureAudio();
+        if (!audioCtx) return;
+        const ready =
+            audioCtx.state === 'suspended' ? audioCtx.resume().catch(() => {}) : Promise.resolve();
+        ready.then(() => {
+            if (muted || !audioCtx) return;
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = 'sine';
+            o.frequency.value = freq || 660;
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            const t = audioCtx.currentTime;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+            g.gain.setValueAtTime(0.18, t + 0.12);
+            g.gain.linearRampToValueAtTime(0, t + 0.18);
+            o.start(t);
+            o.stop(t + 0.2);
+        });
+    }
+    function playDisconnectAlert() {
+        beep(440);
+        setTimeout(() => beep(330), 180);
     }
     function startBeeping() {
         if (beepTimer) return;
@@ -76,6 +86,8 @@
 
     // Клик где угодно в гриде — инициализирует AudioContext (требование браузеров).
     grid.addEventListener('click', ensureAudio, { once: true });
+    document.addEventListener('pointerdown', ensureAudio, { once: true, capture: true });
+    document.addEventListener('keydown', ensureAudio, { once: true, capture: true });
 
     // ---------- Log ----------
     function logEvent(html, klass) {
@@ -88,9 +100,10 @@
 
     // ---------- Cards ----------
     function ensureCard(pid, name) {
+        pid = Number(pid);
         let card = cards.get(pid);
         if (card) return card;
-        if (emptyState) emptyState.remove();
+        removeEmptyState();
         card = document.createElement('div');
         card.className = 'screen-card';
         card.dataset.pid = String(pid);
@@ -106,14 +119,50 @@
         return card;
     }
     function removeCard(pid) {
+        pid = Number(pid);
         const c = cards.get(pid);
         if (c) c.remove();
         cards.delete(pid);
+        connected.delete(pid);
         lastTs.delete(pid);
         stale.delete(pid);
         if (fullscreenPid === pid) fullscreenPid = null;
     }
+    function removeEmptyState() {
+        const currentEmptyState = document.getElementById('empty-state');
+        if (currentEmptyState) currentEmptyState.remove();
+    }
+    function showEmptyState(text) {
+        if (document.getElementById('empty-state') || cards.size > 0) return;
+        const div = document.createElement('div');
+        div.className = 'live-empty muted';
+        div.id = 'empty-state';
+        div.textContent = text;
+        grid.appendChild(div);
+    }
+    function setCardConnected(pid, isConnected) {
+        pid = Number(pid);
+        const card = cards.get(pid);
+        if (!card) return;
+        if (isConnected) {
+            connected.add(pid);
+            card.classList.remove('stale');
+            stale.delete(pid);
+            setCardSince(pid, lastTs.get(pid));
+        } else {
+            connected.delete(pid);
+            card.classList.add('stale');
+            stale.add(pid);
+            const since = card.querySelector('.screen-since');
+            if (since) since.textContent = 'отключился';
+        }
+        staleNum.textContent = String(stale.size);
+        staleCount.classList.toggle('hidden', stale.size === 0);
+        refreshBeeping();
+        refreshCount();
+    }
     function setCardImage(pid, dataUrl) {
+        pid = Number(pid);
         const card = cards.get(pid);
         if (!card) return;
         const slot = card.querySelector('.screen-img');
@@ -126,6 +175,7 @@
         img.src = dataUrl;
     }
     function setCardSince(pid, ts) {
+        pid = Number(pid);
         const card = cards.get(pid);
         if (!card) return;
         const since = card.querySelector('.screen-since');
@@ -139,6 +189,7 @@
         else since.textContent = Math.round(dt / 60000) + ' мин назад';
     }
     function setCardStale(pid, isStale) {
+        pid = Number(pid);
         const card = cards.get(pid);
         if (!card) return;
         if (isStale) {
@@ -154,6 +205,7 @@
     }
 
     function toggleFullscreen(pid) {
+        pid = Number(pid);
         const card = cards.get(pid);
         if (!card) return;
         if (fullscreenPid === pid) {
@@ -169,7 +221,7 @@
     }
 
     function refreshCount() {
-        liveCount.textContent = String(cards.size);
+        liveCount.textContent = String(connected.size);
     }
 
     function hydrateInitialCards() {
@@ -183,6 +235,7 @@
             card.dataset.name = name;
             card.addEventListener('click', () => toggleFullscreen(pid));
             cards.set(pid, card);
+            connected.add(pid);
         });
         refreshCount();
     }
@@ -213,13 +266,17 @@
             }
             // Перерисовать карточки исходя из актуального списка.
             for (const pid of [...cards.keys()]) removeCard(pid);
+            connected.clear();
             resp.participants.forEach((p) => {
-                ensureCard(p.id, p.name);
+                const pid = Number(p.id);
+                ensureCard(pid, p.name);
+                setCardConnected(pid, true);
                 if (p.lastFrameTs) {
-                    lastTs.set(p.id, Number(p.lastFrameTs));
-                    setCardSince(p.id, Number(p.lastFrameTs));
+                    lastTs.set(pid, Number(p.lastFrameTs));
+                    setCardSince(pid, Number(p.lastFrameTs));
                 }
             });
+            if (cards.size === 0) showEmptyState('Ожидание участников.');
             refreshCount();
         });
     });
@@ -235,42 +292,42 @@
     });
 
     socket.on('frame', ({ participantId, ts, dataUrl }) => {
-        const card = cards.get(participantId);
+        const pid = Number(participantId);
+        const card = cards.get(pid);
         if (!card) return; // join придёт чуть позже или мы ещё не подписались
-        setCardImage(participantId, dataUrl);
-        lastTs.set(participantId, ts);
-        setCardSince(participantId, ts);
-        if (stale.has(participantId)) setCardStale(participantId, false);
+        setCardConnected(pid, true);
+        setCardImage(pid, dataUrl);
+        lastTs.set(pid, ts);
+        setCardSince(pid, ts);
+        if (stale.has(pid)) setCardStale(pid, false);
     });
     socket.on('participant:join', ({ participantId, name }) => {
-        ensureCard(participantId, name);
+        const pid = Number(participantId);
+        ensureCard(pid, name);
+        setCardConnected(pid, true);
         refreshCount();
         logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
     });
     socket.on('participant:leave', ({ participantId }) => {
-        const card = cards.get(participantId);
+        const pid = Number(participantId);
+        const card = cards.get(pid);
         const name = card ? card.dataset.name : '?';
-        removeCard(participantId);
-        refreshCount();
-        if (cards.size === 0 && !document.getElementById('empty-state')) {
-            const div = document.createElement('div');
-            div.className = 'live-empty muted';
-            div.id = 'empty-state';
-            div.textContent = 'Все участники отключились.';
-            grid.appendChild(div);
-        }
+        if (card) setCardConnected(pid, false);
+        else refreshCount();
+        playDisconnectAlert();
         logEvent(`Отключился <strong>${escapeHtml(name)}</strong>`, 'log-leave');
     });
     socket.on('participant:stale', ({ participantId, silentMs }) => {
-        if (!cards.has(participantId)) return;
-        if (!stale.has(participantId)) {
-            const card = cards.get(participantId);
+        const pid = Number(participantId);
+        if (!cards.has(pid)) return;
+        if (!stale.has(pid)) {
+            const card = cards.get(pid);
             logEvent(
                 `<strong>${escapeHtml(card.dataset.name)}</strong> молчит ${Math.round(silentMs / 1000)} сек`,
                 'log-warn'
             );
         }
-        setCardStale(participantId, true);
+        setCardStale(pid, true);
     });
 
     function escapeHtml(s) {
