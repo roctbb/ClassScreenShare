@@ -1366,6 +1366,25 @@ label {
     position: relative;
 }
 
+.player-wrap-gap {
+    background: #000;
+}
+
+.player-wrap-gap::before {
+    content: 'Нет связи';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
 .player-exam-time {
     position: absolute;
     top: 12px;

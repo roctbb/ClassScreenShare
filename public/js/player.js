@@ -170,23 +170,61 @@
                 break;
             }
         }
-        if (idx !== state.currentImgIdx) {
-            state.currentImgIdx = idx;
-            slideImg.src = cfg.frameUrlBase + frames[idx].id;
+        const inGap = isInGap(ms);
+
+        // Во время gap — чёрный кадр (не обновляем src, скрываем img).
+        const wrap = slideImg.parentElement;
+        if (inGap) {
+            slideImg.style.visibility = 'hidden';
+            if (wrap) wrap.classList.add('player-wrap-gap');
+        } else {
+            slideImg.style.visibility = '';
+            if (wrap) wrap.classList.remove('player-wrap-gap');
+            if (idx !== state.currentImgIdx) {
+                state.currentImgIdx = idx;
+                slideImg.src = cfg.frameUrlBase + frames[idx].id;
+            }
         }
         setCursor(ms);
 
-        // Время от начала экзамена.
+        // Время от начала экзамена — считаем плавно с учётом видео-времени и реальной растяжки в gap'ах.
         if (examTimeOverlay && cfg.examStartedAt) {
-            const frameTs = frames[idx].ts;
-            const elapsed = frameTs - cfg.examStartedAt;
+            const elapsed = computeRealElapsed(ms);
             examTimeOverlay.textContent = fmtExamTime(Math.max(0, elapsed));
         }
 
-        // Индикация пропуска.
+        // Индикация пропуска (текстовый бейдж).
         if (gapIndicator) {
-            gapIndicator.classList.toggle('hidden', !isInGap(ms));
+            gapIndicator.classList.toggle('hidden', !inGap);
         }
+    }
+
+    /**
+     * Считает реальное время с начала экзамена в позиции videoMs.
+     * В gap'ах видео-время сжато до maxGapMs, а реальное продолжает идти —
+     * интерполируем линейно от ts начала gap до ts конца gap.
+     */
+    function computeRealElapsed(videoMs) {
+        const frames = timeline.frames;
+        if (!frames.length) return 0;
+        const firstTs = frames[0].ts;
+
+        // Найдём кадр, в котором videoMs.
+        let idx = frames.length - 1;
+        for (let i = 0; i < frames.length; i++) {
+            if (videoMs >= frames[i].vo && videoMs < frames[i].vo + frames[i].d) {
+                idx = i;
+                break;
+            }
+        }
+        const cur = frames[idx];
+        const next = frames[idx + 1];
+        const realIntervalMs = next ? next.ts - cur.ts : cur.d;
+        // Доля прохождения текущего "слота" в видео.
+        const localFrac = cur.d > 0 ? (videoMs - cur.vo) / cur.d : 0;
+        // Реальный момент = ts текущего кадра + доля * реальный интервал
+        const realTs = cur.ts + localFrac * realIntervalMs;
+        return realTs - cfg.examStartedAt;
     }
 
     function updateSlideshow() {
