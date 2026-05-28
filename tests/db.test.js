@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 
-// ENV для подключения должен быть выставлен ДО импорта db/index.
 process.env.DB_HOST = process.env.DB_HOST || 'localhost';
 process.env.DB_PORT = process.env.DB_PORT || '5433';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret-1234567890abcdef';
@@ -26,7 +25,6 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-    // Чистим таблицы перед каждым тестом, чтобы изоляция была.
     await sequelize.query(
         'TRUNCATE TABLE frames, recordings, participant_connections, participants, exams, users RESTART IDENTITY CASCADE'
     );
@@ -34,9 +32,10 @@ beforeEach(async () => {
 
 describe('exams service', () => {
     it('creates an exam with auto-generated code', async () => {
-        const admin = await usersService.createLocalAdmin({
-            login: 'admin',
-            password: 'secret123',
+        const admin = await usersService.upsertGeekclassUser({
+            externalId: '1',
+            name: 'Admin',
+            role: 'admin',
         });
         const exam = await examsService.createExam({ name: 'Алгебра', createdBy: admin.id });
         expect(exam.id).toBeGreaterThan(0);
@@ -49,17 +48,6 @@ describe('exams service', () => {
     it('creates an exam with manual normalized code', async () => {
         const exam = await examsService.createExam({ name: 'Алгебра', code: ' math-9 ' });
         expect(exam.code).toBe('MATH-9');
-    });
-
-    it('stores GeekClass-only entry setting', async () => {
-        const regular = await examsService.createExam({ name: 'Обычный экзамен' });
-        const required = await examsService.createExam({
-            name: 'GeekClass экзамен',
-            requireGeekclass: true,
-        });
-
-        expect(regular.requireGeekclass).toBe(false);
-        expect(required.requireGeekclass).toBe(true);
     });
 
     it('rejects duplicate manual code', async () => {
@@ -117,7 +105,7 @@ describe('exams service', () => {
         await Participant.create({
             examId: e.id,
             name: 'Иван',
-            token: 'sometoken',
+            geekclassId: '999',
             joinedAt: new Date(),
         });
         const ok = await examsService.deleteExam(e.id);
@@ -134,25 +122,27 @@ describe('participants service', () => {
         await examsService.activateExam(exam.id);
     });
 
-    it('creates new participant when no token', async () => {
+    it('creates new participant on first join', async () => {
         const { participant, resumed } = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван Петров',
+            geekclassId: '42',
         });
         expect(resumed).toBe(false);
         expect(participant.name).toBe('Иван Петров');
-        expect(participant.token).toMatch(/^[A-Za-z0-9_-]+$/);
+        expect(participant.geekclassId).toBe('42');
     });
 
-    it('resumes existing participant when token matches', async () => {
+    it('resumes existing participant when geekclassId matches', async () => {
         const first = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван',
+            geekclassId: '42',
         });
         const second = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван',
-            token: first.participant.token,
+            geekclassId: '42',
         });
         expect(second.resumed).toBe(true);
         expect(second.participant.id).toBe(first.participant.id);
@@ -162,27 +152,45 @@ describe('participants service', () => {
         const first = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван',
+            geekclassId: '42',
         });
         const second = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван Петров',
-            token: first.participant.token,
+            geekclassId: '42',
         });
         expect(second.participant.id).toBe(first.participant.id);
         expect(second.participant.name).toBe('Иван Петров');
     });
 
-    it('creates new participant when token belongs to another exam', async () => {
+    it('clears leftAt on resume', async () => {
+        const first = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'Иван',
+            geekclassId: '42',
+        });
+        await participantsService.leave(first.participant.id);
+        const second = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'Иван',
+            geekclassId: '42',
+        });
+        expect(second.resumed).toBe(true);
+        expect(second.participant.leftAt).toBeNull();
+    });
+
+    it('creates separate participants for same user in different exams', async () => {
         const otherExam = await examsService.createExam({ name: 'Other' });
         await examsService.activateExam(otherExam.id);
         const first = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван',
+            geekclassId: '42',
         });
         const second = await participantsService.joinOrResume({
             examId: otherExam.id,
             name: 'Иван',
-            token: first.participant.token, // токен от другого экзамена
+            geekclassId: '42',
         });
         expect(second.resumed).toBe(false);
         expect(second.participant.id).not.toBe(first.participant.id);
@@ -190,10 +198,16 @@ describe('participants service', () => {
 
     it('rejects empty/missing name', async () => {
         await expect(
-            participantsService.joinOrResume({ examId: exam.id, name: '' })
+            participantsService.joinOrResume({ examId: exam.id, name: '', geekclassId: '1' })
         ).rejects.toMatchObject({ status: 400 });
         await expect(
-            participantsService.joinOrResume({ examId: exam.id, name: '   ' })
+            participantsService.joinOrResume({ examId: exam.id, name: '   ', geekclassId: '1' })
+        ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('rejects missing geekclassId', async () => {
+        await expect(
+            participantsService.joinOrResume({ examId: exam.id, name: 'Иван' })
         ).rejects.toMatchObject({ status: 400 });
     });
 
@@ -202,9 +216,26 @@ describe('participants service', () => {
         const { participant } = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван',
+            geekclassId: '42',
             userAgent: longUa,
         });
         expect(participant.userAgent.length).toBeLessThanOrEqual(512);
+    });
+
+    it('findByGeekclassId returns participant', async () => {
+        const { participant } = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'Иван',
+            geekclassId: '42',
+        });
+        const found = await participantsService.findByGeekclassId(exam.id, '42');
+        expect(found).not.toBeNull();
+        expect(found.id).toBe(participant.id);
+    });
+
+    it('findByGeekclassId returns null for unknown id', async () => {
+        const found = await participantsService.findByGeekclassId(exam.id, 'unknown');
+        expect(found).toBeNull();
     });
 });
 
@@ -214,6 +245,7 @@ describe('participant connection logs', () => {
         const { participant } = await participantsService.joinOrResume({
             examId: exam.id,
             name: 'Иван',
+            geekclassId: '42',
         });
 
         const event = await ParticipantConnection.create({
@@ -230,6 +262,36 @@ describe('participant connection logs', () => {
             where: { participantId: participant.id },
         });
         expect(count).toBe(1);
+    });
+
+    it('listForExam groups events by participantId', async () => {
+        const exam = await examsService.createExam({ name: 'Test' });
+        const p1 = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'A',
+            geekclassId: '1',
+        });
+        const p2 = await participantsService.joinOrResume({
+            examId: exam.id,
+            name: 'B',
+            geekclassId: '2',
+        });
+        await ParticipantConnection.create({
+            participantId: p1.participant.id,
+            examId: exam.id,
+            socketId: 's1',
+            event: 'connect',
+        });
+        await ParticipantConnection.create({
+            participantId: p2.participant.id,
+            examId: exam.id,
+            socketId: 's2',
+            event: 'connect',
+        });
+        const map = await participantConnectionsService.listForExam(exam.id);
+        expect(map.size).toBe(2);
+        expect(map.get(p1.participant.id)).toHaveLength(1);
+        expect(map.get(p2.participant.id)).toHaveLength(1);
     });
 
     it('builds readable connection sessions from socket events', () => {
@@ -278,52 +340,92 @@ describe('participant connection logs', () => {
         expect(timeline.summary.activeSessions).toBe(1);
         expect(timeline.sessions[0].durationLabel).toBe('12 сек');
     });
+
+    it('calcTotalAbsenceMs sums gaps between non-overlapping sessions', () => {
+        // Сессия 1: 10:00-10:05 (5 мин), пропуск 2 мин, сессия 2: 10:07-10:10
+        // Итого отсутствие = 2 минуты = 120 000 мс
+        const timeline = participantConnectionsService.buildConnectionSessions(
+            [
+                {
+                    socketId: 's1',
+                    event: 'connect',
+                    createdAt: new Date('2026-05-28T10:00:00Z'),
+                },
+                {
+                    socketId: 's1',
+                    event: 'disconnect',
+                    reason: 'transport close',
+                    createdAt: new Date('2026-05-28T10:05:00Z'),
+                },
+                {
+                    socketId: 's2',
+                    event: 'connect',
+                    createdAt: new Date('2026-05-28T10:07:00Z'),
+                },
+                {
+                    socketId: 's2',
+                    event: 'disconnect',
+                    reason: 'transport close',
+                    createdAt: new Date('2026-05-28T10:10:00Z'),
+                },
+            ],
+            { now: new Date('2026-05-28T10:11:00Z') }
+        );
+        expect(timeline.summary.totalAbsenceMs).toBe(2 * 60 * 1000);
+    });
+
+    it('calcTotalAbsenceMs ignores overlapping sessions', () => {
+        // Две сессии перекрываются — отсутствия нет.
+        const timeline = participantConnectionsService.buildConnectionSessions(
+            [
+                {
+                    socketId: 's1',
+                    event: 'connect',
+                    createdAt: new Date('2026-05-28T10:00:00Z'),
+                },
+                {
+                    socketId: 's2',
+                    event: 'connect',
+                    createdAt: new Date('2026-05-28T10:02:00Z'),
+                },
+                {
+                    socketId: 's1',
+                    event: 'disconnect',
+                    reason: 'transport close',
+                    createdAt: new Date('2026-05-28T10:05:00Z'),
+                },
+                {
+                    socketId: 's2',
+                    event: 'disconnect',
+                    reason: 'transport close',
+                    createdAt: new Date('2026-05-28T10:08:00Z'),
+                },
+            ],
+            { now: new Date('2026-05-28T10:09:00Z') }
+        );
+        expect(timeline.summary.totalAbsenceMs).toBe(0);
+    });
 });
 
-describe('users service', () => {
-    it('createLocalAdmin hashes password', async () => {
-        const u = await usersService.createLocalAdmin({
-            login: 'a',
-            password: 'secret123',
+describe('users service (GeekClass)', () => {
+    it('upsertGeekclassUser creates user with role', async () => {
+        const u = await usersService.upsertGeekclassUser({
+            externalId: '42',
+            name: 'Иван',
+            role: 'teacher',
         });
-        expect(u.passwordHash).not.toBe('secret123');
-        expect(u.passwordHash).toMatch(/^\$2[aby]\$/); // bcrypt prefix
+        expect(u.provider).toBe('geekclass');
+        expect(u.externalId).toBe('42');
+        expect(u.role).toBe('teacher');
     });
 
-    it('rejects short passwords', async () => {
-        await expect(usersService.createLocalAdmin({ login: 'a', password: '12' })).rejects.toThrow(
-            /at least/
-        );
-    });
-
-    it('authenticateLocal returns user on correct password', async () => {
-        await usersService.createLocalAdmin({ login: 'a', password: 'secret123' });
-        const u = await usersService.authenticateLocal('a', 'secret123');
-        expect(u).not.toBeNull();
-        expect(u.lastLoginAt).toBeInstanceOf(Date);
-    });
-
-    it('authenticateLocal returns null on wrong password', async () => {
-        await usersService.createLocalAdmin({ login: 'a', password: 'secret123' });
-        const u = await usersService.authenticateLocal('a', 'wrong');
-        expect(u).toBeNull();
-    });
-
-    it('authenticateLocal returns null for non-existent user', async () => {
-        const u = await usersService.authenticateLocal('nobody', 'pw');
-        expect(u).toBeNull();
-    });
-
-    it('upsertGeekclassUser creates and updates by external_id', async () => {
+    it('upsertGeekclassUser updates existing user by external_id', async () => {
         const u1 = await usersService.upsertGeekclassUser({
             externalId: '42',
             name: 'Test',
             role: 'teacher',
         });
-        expect(u1.provider).toBe('geekclass');
-        expect(u1.externalId).toBe('42');
 
-        // Повторный вызов с тем же externalId — обновление, не создание
         const u2 = await usersService.upsertGeekclassUser({
             externalId: 42,
             name: 'Test Updated',
@@ -331,18 +433,18 @@ describe('users service', () => {
         });
         expect(u2.id).toBe(u1.id);
         expect(u2.name).toBe('Test Updated');
+        expect(u2.role).toBe('admin');
 
         const total = await User.count({ where: { provider: 'geekclass' } });
         expect(total).toBe(1);
     });
 
-    it('bootstrapFromEnv only creates user when table is empty', async () => {
-        await usersService.bootstrapFromEnv({ login: 'admin', password: 'secret123' });
-        const cnt1 = await User.count();
-        expect(cnt1).toBe(1);
-        // Второй вызов — ничего не делает
-        await usersService.bootstrapFromEnv({ login: 'admin2', password: 'secret456' });
-        const cnt2 = await User.count();
-        expect(cnt2).toBe(1);
+    it('upsertGeekclassUser defaults invalid role to teacher', async () => {
+        const u = await usersService.upsertGeekclassUser({
+            externalId: '42',
+            name: 'Test',
+            role: 'student',
+        });
+        expect(u.role).toBe('teacher');
     });
 });

@@ -17,166 +17,101 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
         <div class="summary-tile">
             <span class="summary-label">Кадры</span>
             <strong><%= frameCount %></strong>
-        </div>
-        <div class="summary-tile">
-            <span class="summary-label">Подключение</span>
-            <strong class="summary-value-sm">
-                <% if (hasConnectionEvents) { %> <%= connectionSummary.isOnline ? 'онлайн' :
-                'отключен' %> <% } else { %>нет событий<% } %>
-            </strong>
-            <% if (hasConnectionEvents) { %>
-            <small>Сессий: <%= connectionSummary.totalSessions %></small>
+            <% if (frameCount > 0 && lastSeenAt && joinedAt) { %>
+            <small><%= new Date(joinedAt).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) %> – <%= new Date(lastSeenAt).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) %></small>
             <% } %>
         </div>
         <div class="summary-tile">
-            <span class="summary-label">Последний кадр</span>
+            <span class="summary-label">Сессий</span>
             <strong class="summary-value-sm">
-                <%= lastSeenAt ? new Date(lastSeenAt).toLocaleString('ru-RU') : '—' %>
+                <%= hasConnectionEvents ? connectionSummary.totalSessions : '—' %>
             </strong>
+            <% if (hasConnectionEvents && connectionSummary.totalAbsenceLabel && connectionSummary.totalAbsenceMs > 0) { %>
+            <small class="summary-danger">отсутствие: <%= connectionSummary.totalAbsenceLabel %></small>
+            <% } %>
         </div>
         <div class="summary-tile">
             <span class="summary-label">Видео</span>
             <% if (recordingStatus === 'done') { %>
-            <strong class="summary-value-sm">готово</strong>
+            <strong class="summary-value-sm">✓ готово</strong>
             <% if (hasVideoMeta) { %>
-            <small
-                ><%= (durationMs / 1000).toFixed(1) %> сек, <%= (sizeBytes / 1024).toFixed(0) %>
-                КБ</small
-            >
-            <% } %> <% } else if (recordingStatus === 'pending' || recordingStatus === 'running') {
-            %>
-            <strong class="summary-value-sm">конвертируется</strong>
+            <small><%= (durationMs / 1000).toFixed(0) %> сек · <%= (sizeBytes / 1024 / 1024).toFixed(1) %> МБ</small>
+            <% } %>
+            <% } else if (recordingStatus === 'pending' || recordingStatus === 'running') { %>
+            <strong class="summary-value-sm">⟳ конвертируется</strong>
             <% } else if (recordingStatus === 'failed') { %>
-            <strong class="summary-value-sm summary-danger">ошибка</strong>
+            <strong class="summary-value-sm summary-danger">✗ ошибка</strong>
             <% } else if (frameCount > 0) { %>
-            <strong class="summary-value-sm">покадрово</strong>
+            <strong class="summary-value-sm muted">слайдшоу</strong>
+            <small>можно сконвертировать</small>
             <% } else { %>
-            <strong class="summary-value-sm">нет кадров</strong>
+            <strong class="summary-value-sm muted">—</strong>
             <% } %>
         </div>
     </div>
 
     <div class="participant-jump-row">
-        <a class="btn btn-sm btn-secondary" href="#connection-log">Лог подключений</a>
         <% if (frameCount > 0) { %>
-        <a class="btn btn-sm btn-secondary" href="#participant-recording">Просмотр записи</a>
+        <a class="btn btn-sm btn-secondary" href="#participant-recording">▶ Просмотр записи</a>
         <% } %>
+        <% if (frameCount > 0 && (!recording || recording.status === 'failed' || recording.status === 'done')) { %>
+        <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/convert" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <button type="submit" class="btn btn-sm btn-secondary">
+                <%= recording && recording.status === 'done' ? '⬇ Переконвертировать' : '⬇ В видео' %>
+            </button>
+        </form>
+        <% } %>
+        <% if (recording && recording.status === 'done') { %>
+        <a class="btn btn-sm btn-secondary" href="/admin/api/recordings/<%= recording.id %>/video?download=1">⬇ Скачать mp4</a>
+        <% } %>
+        <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/delete"
+            onsubmit="return confirm('Удалить участника и все его записи? Действие необратимо.');" style="display:inline">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <button type="submit" class="btn btn-sm btn-danger">🗑 Удалить</button>
+        </form>
     </div>
 
-    <div class="card">
-        <h2>Информация</h2>
-        <dl class="kv">
-            <dt>Кадров записано:</dt>
-            <dd><%= frameCount %></dd>
-            <dt>Подключился:</dt>
-            <dd><%= new Date(joinedAt).toLocaleString('ru-RU') %></dd>
-            <% if (lastSeenAt) { %>
-            <dt>Последний кадр:</dt>
-            <dd><%= new Date(lastSeenAt).toLocaleString('ru-RU') %></dd>
-            <% } %>
-            <dt>Статус видео:</dt>
-            <dd>
-                <% if (recordingStatus === 'done') { %>
-                <span class="badge badge-active">готово</span>
-                <% if (hasVideoMeta) { %> (<%= (durationMs / 1000).toFixed(1) %> сек, <%= (sizeBytes
-                / 1024).toFixed(0) %> КБ) <% } %> <% } else if (recordingStatus === 'pending' ||
-                recordingStatus === 'running') { %>
-                <span class="badge badge-draft">конвертируется</span>
-                <% } else if (recordingStatus === 'failed') { %>
-                <span class="badge badge-finished">ошибка</span>
-                <details class="error-details">
-                    <summary>Подробности</summary>
-                    <pre><%= recording.errorMessage ?? recording.error_message %></pre>
-                </details>
-                <% } else if (frameCount > 0) { %>
-                <span class="muted">не сконвертировано (доступен покадровый просмотр)</span>
-                <% } else { %>
-                <span class="muted">кадров нет</span>
-                <% } %>
-            </dd>
-        </dl>
-
-        <div class="actions-row section-actions">
-            <% if (frameCount > 0 && (!recording || recording.status === 'failed' ||
-            recording.status === 'done')) { %>
-            <form
-                method="post"
-                action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/convert"
-            >
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <button type="submit" class="btn btn-secondary">
-                    <%= recording && recording.status === 'done' ? 'Переконвертировать' :
-                    'Сконвертировать в видео' %>
-                </button>
-            </form>
-            <% } %> <% if (recording && recording.status === 'done') { %>
-            <a class="btn" href="/admin/api/recordings/<%= recording.id %>/video?download=1">
-                Скачать видео
-            </a>
-            <% } %>
-            <form
-                method="post"
-                action="/admin/exams/<%= exam.id %>/participants/<%= participant.id %>/delete"
-                onsubmit="return confirm('Удалить участника и все его записи? Действие необратимо.');"
-            >
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <button type="submit" class="btn btn-danger">Удалить участника</button>
-            </form>
-        </div>
+    <% if (recordingStatus === 'failed') { %>
+    <div class="alert alert-error">
+        <strong>Ошибка конвертации:</strong>
+        <details><summary>Подробности</summary><pre><%= recording.errorMessage ?? recording.error_message %></pre></details>
     </div>
+    <% } %>
 
-    <div class="card" id="connection-log">
-        <div class="card-heading">
-            <h2>Лог подключений</h2>
-            <% if (connectionSummary && connectionSummary.totalSessions > 0) { %>
-            <span
-                class="connection-state <%= connectionSummary.isOnline ? 'connection-state-online' : 'connection-state-offline' %>"
-            >
-                <span class="conn-dot"></span>
-                <%= connectionSummary.isOnline ? 'сейчас подключен' : 'сейчас отключен' %>
+    <!-- Лог подключений свёрнут по умолчанию -->
+    <details class="card connection-log-details" id="connection-log" <%= connectionSummary && connectionSummary.isOnline ? 'open' : '' %>>
+        <summary class="connection-log-summary">
+            <span>Подключения</span>
+            <% if (hasConnectionEvents) { %>
+            <span class="connection-state <%= connectionSummary.isOnline ? 'connection-state-online' : 'connection-state-offline' %>">
+                <span class="conn-dot"></span><%= connectionSummary.isOnline ? 'онлайн' : 'отключен' %>
             </span>
+            <span class="muted">сессий: <%= connectionSummary.totalSessions %></span>
+            <% if (connectionSummary.totalAbsenceLabel && connectionSummary.totalAbsenceLabel !== '—') { %>
+            <span class="muted">отсутствие: <%= connectionSummary.totalAbsenceLabel %></span>
             <% } %>
-        </div>
+            <% } %>
+        </summary>
         <% if (!connectionSessions || connectionSessions.length === 0) { %>
         <p class="muted">Пока нет событий подключения.</p>
         <% } else { %>
-        <div class="connection-summary-row">
-            <span>Сессий: <strong><%= connectionSummary.totalSessions %></strong></span>
-            <span>Активных: <strong><%= connectionSummary.activeSessions %></strong></span>
-            <% if (connectionSummary.lastSession && connectionSummary.lastSession.socketId) { %>
-            <span>
-                Последний socket:
-                <code title="<%= connectionSummary.lastSession.socketId %>"
-                    ><%= connectionSummary.lastSession.socketShort %></code
-                >
-            </span>
-            <% } %>
-        </div>
         <div class="table-shell connection-log-shell">
             <table class="data-table connection-log-table">
                 <thead>
                     <tr>
                         <th>Начало</th>
-                        <th>Окончание</th>
+                        <th>Конец</th>
                         <th>Длительность</th>
                         <th>Статус</th>
-                        <th>Socket</th>
-                        <th>IP</th>
                         <th>Причина</th>
-                        <th>User-Agent</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% connectionSessions.forEach(session => { %>
                     <tr>
-                        <td class="muted">
-                            <%= session.startedAt ? new
-                            Date(session.startedAt).toLocaleString('ru-RU') : '—' %>
-                        </td>
-                        <td class="muted">
-                            <%= session.endedAt ? new Date(session.endedAt).toLocaleString('ru-RU')
-                            : '—' %>
-                        </td>
+                        <td class="muted"><%= session.startedAt ? new Date(session.startedAt).toLocaleTimeString('ru-RU') : '—' %></td>
+                        <td class="muted"><%= session.endedAt ? new Date(session.endedAt).toLocaleTimeString('ru-RU') : '—' %></td>
                         <td><%= session.durationLabel %></td>
                         <td>
                             <% if (session.status === 'active') { %>
@@ -185,80 +120,34 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
                             <span class="badge badge-finished">завершено</span>
                             <% } %>
                         </td>
-                        <td>
-                            <code title="<%= session.socketId || '' %>"
-                                ><%= session.socketShort || '—' %></code
-                            >
-                        </td>
-                        <td><%= session.ip || '—' %></td>
-                        <td class="muted" title="<%= session.reason || '' %>">
-                            <%= session.reasonLabel || '—' %>
-                        </td>
-                        <td class="muted user-agent-cell"><%= session.userAgent || '—' %></td>
+                        <td class="muted"><%= session.reasonLabel || '—' %></td>
                     </tr>
                     <% }) %>
                 </tbody>
             </table>
         </div>
         <% } %>
-    </div>
+    </details>
 
-    <% if (recording && recording.status === 'done') { %>
+    <% if (frameCount > 0) { %>
     <div class="card player-card" id="participant-recording">
         <div class="player-wrap">
-            <video id="player" controls preload="metadata" playsinline>
-                <source
-                    src="/admin/api/recordings/<%= recording.id %>/video"
-                    type="video/<%= recording.format %>"
-                />
-                Видео не поддерживается этим браузером.
-            </video>
+            <img id="slideshow-img" alt="кадр" />
+            <div class="player-exam-time" id="exam-time-overlay">00:00:00</div>
         </div>
-        <div class="player-controls">
-            <div class="speed-buttons" id="speeds"></div>
-            <div class="player-time">
-                <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
-            </div>
-        </div>
-        <div class="timeline-wrap">
-            <svg
-                class="timeline"
-                id="timeline"
-                viewBox="0 0 1000 40"
-                preserveAspectRatio="none"
-            ></svg>
-            <div class="timeline-tooltip hidden" id="tl-tooltip"></div>
-        </div>
-    </div>
-
-    <script>
-        window.__PLAYER__ = {
-            mode: 'video',
-            videoUrl: '/admin/api/recordings/<%= recording.id %>/video',
-            timelineUrl: '/admin/api/recordings/<%= recording.id %>/timeline',
-        };
-    </script>
-    <script src="/js/player.js?v=<%= assetVersion %>"></script>
-
-    <% } else if (frameCount > 0) { %>
-    <div class="card player-card" id="participant-recording">
-        <p class="muted player-note">Видео ещё не готово. Покадровый просмотр доступен ниже.</p>
-        <div class="player-wrap"><img id="slideshow-img" alt="кадр" /></div>
         <div class="player-controls">
             <button class="btn btn-secondary btn-sm" id="play-pause">Воспроизвести</button>
             <div class="speed-buttons" id="speeds"></div>
             <div class="player-time">
                 <span id="cur-time">00:00</span> / <span id="total-time">00:00</span>
             </div>
+            <span id="gap-indicator" class="gap-indicator hidden">⚠ пропуск связи</span>
         </div>
         <div class="timeline-wrap">
-            <svg
-                class="timeline"
-                id="timeline"
-                viewBox="0 0 1000 40"
-                preserveAspectRatio="none"
-            ></svg>
+            <svg class="timeline" id="timeline" viewBox="0 0 1000 40" preserveAspectRatio="none"></svg>
             <div class="timeline-tooltip hidden" id="tl-tooltip"></div>
+        </div>
+        <div class="player-actions">
         </div>
     </div>
 
@@ -267,6 +156,8 @@ recording.size_bytes) : null; %> <% const hasVideoMeta = durationMs != null && s
             mode: 'slideshow',
             framesUrl: '/admin/api/participants/<%= participant.id %>/frames',
             frameUrlBase: '/admin/api/frames/',
+            examStartedAt: <%= exam.started_at ? new Date(exam.started_at).getTime() : 'null' %>,
+            maxGapSeconds: <%= typeof maxGapSeconds !== 'undefined' ? maxGapSeconds : 5 %>,
         };
     </script>
     <script src="/js/player.js?v=<%= assetVersion %>"></script>

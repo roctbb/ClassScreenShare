@@ -59,11 +59,6 @@ const config = {
         password: str('DB_PASSWORD', 'classscreenshare'),
     },
 
-    adminBootstrap: {
-        login: str('ADMIN_LOGIN', null),
-        password: str('ADMIN_PASSWORD', null),
-    },
-
     geekclass: {
         host: str('GEEKCLASS_HOST', null),
         jwtSecret: str('GEEKCLASS_JWT_SECRET', null),
@@ -75,9 +70,9 @@ const config = {
     recordingsDir: RECORDINGS_DIR,
 
     capture: {
-        interval: int('DEFAULT_CAPTURE_INTERVAL', 5000),
-        quality: float('DEFAULT_IMAGE_QUALITY', 0.8),
-        width: int('DEFAULT_IMAGE_WIDTH', 1080),
+        interval: int('DEFAULT_CAPTURE_INTERVAL', 3000),
+        quality: float('DEFAULT_IMAGE_QUALITY', 0.92),
+        width: int('DEFAULT_IMAGE_WIDTH', 1280),
     },
 
     inactivityTimeout: int('INACTIVITY_TIMEOUT', 15000),

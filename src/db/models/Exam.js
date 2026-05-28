@@ -23,12 +23,6 @@ function init(sequelize) {
                 validate: { isIn: [Object.values(STATUS)] },
             },
             createdBy: { type: DataTypes.INTEGER, allowNull: true, field: 'created_by' },
-            requireGeekclass: {
-                type: DataTypes.BOOLEAN,
-                allowNull: false,
-                defaultValue: false,
-                field: 'require_geekclass',
-            },
             captureInterval: {
                 type: DataTypes.INTEGER,
                 allowNull: false,

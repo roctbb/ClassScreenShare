@@ -7,32 +7,87 @@ const logger = require('../logger');
 
 /**
  * Привязывает express-session middleware к указанному socket.io namespace.
- * После этого внутри socket.handshake req будет иметь session.
  */
 function bindSessionToNamespace(ns, sessionMiddleware) {
     ns.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 }
 
 /**
+ * Карта examId -> Map<participantId, lastFrameTs>
+ * Общая для всех viewer'ов, используется stale-детектором.
+ */
+const lastFrameMap = new Map();
+
+function getOrCreate(examId) {
+    if (!lastFrameMap.has(examId)) lastFrameMap.set(examId, new Map());
+    return lastFrameMap.get(examId);
+}
+
+let registered = false;
+let staleTimerInstance = null;
+
+/**
+ * Регистрирует bus listeners и stale-таймер. Идемпотентен — повторные вызовы не дублируют.
+ * Возвращает { staleTimer } для graceful shutdown.
+ */
+function registerBusListeners(ns) {
+    if (registered) return { staleTimer: staleTimerInstance };
+    registered = true;
+
+    bus.on('frame', ({ examId, participantId, ts, dataUrl }) => {
+        getOrCreate(examId).set(participantId, ts);
+        ns.to(`exam:${examId}`).emit('frame', { participantId, ts, dataUrl });
+    });
+    bus.on('join', ({ examId, participantId, name }) => {
+        ns.to(`exam:${examId}`).emit('participant:join', { participantId, name, online: true });
+    });
+    bus.on('leave', ({ examId, participantId }) => {
+        const m = lastFrameMap.get(examId);
+        if (m) m.delete(participantId);
+        ns.to(`exam:${examId}`).emit('participant:leave', { participantId, online: false });
+    });
+
+    // При завершении экзамена — чистим in-memory state.
+    bus.on('exam:finished', ({ examId }) => {
+        lastFrameMap.delete(examId);
+    });
+
+    // Прогресс конвертации видео.
+    bus.on('recording:status', (payload) => {
+        if (!payload || !payload.examId) return;
+        ns.to(`exam:${payload.examId}`).emit('recording:status', payload);
+    });
+    bus.on('recording:progress', (payload) => {
+        if (!payload || !payload.examId) return;
+        ns.to(`exam:${payload.examId}`).emit('recording:progress', payload);
+    });
+
+    // Stale-детектор: раз в 3 сек.
+    staleTimerInstance = setInterval(() => {
+        const now = Date.now();
+        const threshold = config.inactivityTimeout;
+        for (const [examId, parts] of lastFrameMap) {
+            for (const [participantId, lastTs] of parts) {
+                const silentMs = now - lastTs;
+                if (silentMs > threshold) {
+                    ns.to(`exam:${examId}`).emit('participant:stale', {
+                        participantId,
+                        silentMs,
+                    });
+                }
+            }
+        }
+    }, 3000);
+    staleTimerInstance.unref();
+
+    return { staleTimer: staleTimerInstance };
+}
+
+/**
  * Подключает /viewer namespace для админ-мониторинга.
- *
- * Аутентификация: проверяем что в сессии есть userId и что юзер существует.
- * Подписка: после connect клиент шлёт 'subscribe' { examId } и присоединяется
- * к комнате 'exam:<examId>'.
- *
- * Сервер слушает bus и forward'ит события в комнаты:
- *   - frame  → эмитит 'frame' в exam:<examId> комнату
- *   - join   → эмитит 'participant:join' в exam:<examId>
- *   - leave  → эмитит 'participant:leave' в exam:<examId>
- *
- * Stale-детектор: раз в 3 сек проходит по всем участникам активных экзаменов
- * (отслеживает last frame ts in-memory) и шлёт 'participant:stale' если
- * молчание > INACTIVITY_TIMEOUT.
  */
 function attachViewer(io, sessionMiddleware) {
     const ns = io.of('/viewer');
-
-    // session middleware → ns.use, чтобы только viewer namespace требовал сессию.
     bindSessionToNamespace(ns, sessionMiddleware);
 
     ns.use(async (socket, next) => {
@@ -50,56 +105,7 @@ function attachViewer(io, sessionMiddleware) {
         }
     });
 
-    // Карта examId -> Map<participantId, lastFrameTs>
-    // Используется для stale-детектора, общая на всех viewer'ов.
-    const lastFrameMap = new Map();
-
-    function getOrCreate(examId) {
-        if (!lastFrameMap.has(examId)) lastFrameMap.set(examId, new Map());
-        return lastFrameMap.get(examId);
-    }
-
-    // Подписки на bus — единые на всё приложение, не на каждого viewer.
-    bus.on('frame', ({ examId, participantId, ts, dataUrl }) => {
-        getOrCreate(examId).set(participantId, ts);
-        ns.to(`exam:${examId}`).emit('frame', { participantId, ts, dataUrl });
-    });
-    bus.on('join', ({ examId, participantId, name }) => {
-        ns.to(`exam:${examId}`).emit('participant:join', { participantId, name });
-    });
-    bus.on('leave', ({ examId, participantId }) => {
-        const m = lastFrameMap.get(examId);
-        if (m) m.delete(participantId);
-        ns.to(`exam:${examId}`).emit('participant:leave', { participantId });
-    });
-
-    // Прогресс конвертации видео.
-    bus.on('recording:status', (payload) => {
-        if (!payload || !payload.examId) return;
-        ns.to(`exam:${payload.examId}`).emit('recording:status', payload);
-    });
-    bus.on('recording:progress', (payload) => {
-        if (!payload || !payload.examId) return;
-        ns.to(`exam:${payload.examId}`).emit('recording:progress', payload);
-    });
-
-    // Stale-детектор: раз в 3 сек проверяем участников.
-    const staleTimer = setInterval(() => {
-        const now = Date.now();
-        const threshold = config.inactivityTimeout;
-        for (const [examId, parts] of lastFrameMap) {
-            for (const [participantId, lastTs] of parts) {
-                const silentMs = now - lastTs;
-                if (silentMs > threshold) {
-                    ns.to(`exam:${examId}`).emit('participant:stale', {
-                        participantId,
-                        silentMs,
-                    });
-                }
-            }
-        }
-    }, 3000);
-    staleTimer.unref();
+    const { staleTimer } = registerBusListeners(ns);
 
     ns.on('connection', (socket) => {
         const { userId, userLogin } = socket.data;
@@ -124,9 +130,15 @@ function attachViewer(io, sessionMiddleware) {
                 }
                 socket.join(`exam:${examId}`);
 
-                // Отдадим текущее состояние: список участников и последние кадры.
+                // Определяем кто онлайн прямо сейчас — берём из publisher namespace.
+                const publisherNs = io.of('/publisher');
+                const publisherSockets = await publisherNs.in(`exam:${examId}`).fetchSockets();
+                const onlineIds = new Set(
+                    publisherSockets.map((s) => Number(s.data.participantId)).filter(Boolean)
+                );
+
                 const participants = await Participant.findAll({
-                    where: { examId, leftAt: null },
+                    where: { examId },
                     order: [['joined_at', 'ASC']],
                 });
                 const lastFrames = await Promise.all(
@@ -152,6 +164,7 @@ function attachViewer(io, sessionMiddleware) {
                             id: p.id,
                             name: p.name,
                             joinedAt: p.joinedAt,
+                            online: onlineIds.has(p.id),
                             lastFrameTs: lastFrames[i] ? Number(lastFrames[i].ts) : null,
                         })),
                     });
@@ -167,7 +180,7 @@ function attachViewer(io, sessionMiddleware) {
         });
     });
 
-    return ns;
+    return { ns, staleTimer };
 }
 
 module.exports = { attachViewer };

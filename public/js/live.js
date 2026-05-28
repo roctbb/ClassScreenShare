@@ -25,6 +25,27 @@
     const lastTs = new Map(); // pid -> ms
     const stale = new Set(); // pids считаются stale прямо сейчас
 
+    // ---------- Toasts ----------
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+    function showToast(text, kind) {
+        const el = document.createElement('div');
+        el.className = 'toast toast-' + (kind || 'info');
+        el.textContent = text;
+        toastContainer.appendChild(el);
+        // Триггерим CSS transition.
+        requestAnimationFrame(() => el.classList.add('toast-visible'));
+        setTimeout(() => {
+            el.classList.remove('toast-visible');
+            setTimeout(() => el.remove(), 300);
+        }, 3500);
+    }
+
     let muted = false;
     let audioArmed = false;
     let audioCtx = null;
@@ -45,11 +66,13 @@
     }
     function updateAudioButton() {
         if (muted) {
-            muteBtn.textContent = 'Звук выключен';
+            muteBtn.textContent = '🔕';
+            muteBtn.title = 'Звук выключен — нажмите чтобы включить';
             muteBtn.classList.remove('btn-success');
             return;
         }
-        muteBtn.textContent = audioArmed ? 'Звук готов' : 'Включить звук';
+        muteBtn.textContent = audioArmed ? '🔔' : '🔔̇';
+        muteBtn.title = audioArmed ? 'Звук включён' : 'Нажмите чтобы включить звук';
         muteBtn.classList.toggle('btn-success', audioArmed);
     }
     function armAudio() {
@@ -86,6 +109,11 @@
             o.start(t);
             o.stop(t + 0.2);
         });
+    }
+    function playConnectSound() {
+        // Два восходящих тона — "подключился"
+        beep(660);
+        setTimeout(() => beep(880), 150);
     }
     function playDisconnectAlert() {
         beep(440);
@@ -437,7 +465,7 @@
             resp.participants.forEach((p) => {
                 const pid = Number(p.id);
                 ensureCard(pid, p.name);
-                setCardConnected(pid, true);
+                setCardConnected(pid, Boolean(p.online));
                 if (p.lastFrameTs) {
                     lastTs.set(pid, Number(p.lastFrameTs));
                     setCardSince(pid, Number(p.lastFrameTs));
@@ -471,11 +499,19 @@
     });
     socket.on('participant:join', ({ participantId, name }) => {
         const pid = Number(participantId);
+        const isNew = !cards.has(pid);
         ensureCard(pid, name);
         setCardConnected(pid, true);
         refreshCount();
         applyCardFilter();
-        logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
+        if (isNew) {
+            logEvent(`Подключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
+            showToast(`✓ Подключился: ${name}`, 'success');
+        } else {
+            logEvent(`Переподключился <strong>${escapeHtml(name)}</strong>`, 'log-join');
+            showToast(`↻ Переподключился: ${name}`, 'info');
+        }
+        playConnectSound();
     });
     socket.on('participant:leave', ({ participantId }) => {
         const pid = Number(participantId);
@@ -485,6 +521,7 @@
         else refreshCount();
         playDisconnectAlert();
         logEvent(`Отключился <strong>${escapeHtml(name)}</strong>`, 'log-leave');
+        showToast(`✗ Отключился: ${name}`, 'warn');
     });
     socket.on('participant:stale', ({ participantId, silentMs }) => {
         const pid = Number(participantId);

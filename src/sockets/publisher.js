@@ -8,7 +8,7 @@ const participantConnectionsService = require('../services/participantConnection
 const bus = require('../services/bus');
 const config = require('../config');
 const logger = require('../logger');
-const { PARTICIPANT_COOKIE } = require('../routes/exam');
+const PARTICIPANT_PID_COOKIE = 'cs.participant.pid';
 
 /**
  * Подключает /publisher namespace к io.
@@ -46,10 +46,10 @@ function attachPublisher(io) {
         try {
             const raw = socket.handshake.headers.cookie || '';
             const cookies = cookie.parse(raw || '');
-            const token = cookies[PARTICIPANT_COOKIE];
-            if (!token) return next(new Error('no_token'));
+            const pid = Number(cookies[PARTICIPANT_PID_COOKIE]);
+            if (!pid) return next(new Error('no_token'));
 
-            const participant = await Participant.findOne({ where: { token } });
+            const participant = await Participant.findByPk(pid);
             if (!participant) return next(new Error('invalid_token'));
 
             const exam = await Exam.findByPk(participant.examId);
@@ -143,6 +143,7 @@ function attachPublisher(io) {
                 .recordSocketEvent(socket, 'disconnect', finalReason)
                 .catch(() => {});
             framesService.clearState(participantId);
+            participantsService.flushTouch(participantId).catch(() => {});
             bus.emit('leave', { examId, participantId });
         });
     });

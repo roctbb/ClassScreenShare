@@ -37,22 +37,30 @@ async function loadUser(req, res, next) {
 }
 
 /**
- * Требует авторизованного пользователя. Для HTML — редирект на /auth/login,
- * для JSON-API (Accept: application/json) — 401.
+ * Требует авторизованного пользователя с ролью teacher или admin.
+ * Для HTML — редирект на /auth/login, для JSON-API — 401/403.
  */
 function requireAuth(req, res, next) {
-    if (req.user) return next();
-
     const wantsJson =
         req.xhr ||
         (req.headers.accept && req.headers.accept.includes('application/json')) ||
         req.path.startsWith('/api/');
 
-    if (wantsJson) {
-        return res.status(401).json({ error: 'unauthorized' });
+    if (!req.user) {
+        if (wantsJson) return res.status(401).json({ error: 'unauthorized' });
+        const next_ = encodeURIComponent(req.originalUrl || '/');
+        return res.redirect(`/auth/login?next=${next_}`);
     }
-    const next_ = encodeURIComponent(req.originalUrl || '/');
-    return res.redirect(`/auth/login?next=${next_}`);
+
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        if (wantsJson) return res.status(403).json({ error: 'forbidden' });
+        return res.status(403).renderPage('error', {
+            title: 'Доступ запрещён',
+            message: 'Для доступа в админку нужна роль учителя или администратора.',
+        });
+    }
+
+    return next();
 }
 
 module.exports = { loadUser, requireAuth };

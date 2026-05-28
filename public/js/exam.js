@@ -5,13 +5,8 @@
     const cfg = window.__EXAM__;
     const $ = (id) => document.getElementById(id);
 
-    const stepName = $('step-name');
     const stepShare = $('step-share');
     const stepRecording = $('step-recording');
-    const nameForm = $('name-form');
-    const nameInput = $('name');
-    const nameError = $('name-error');
-    const helloName = $('hello-name');
     const startBtn = $('start-share');
     const leaveBtn = $('leave-btn');
     const preview = $('preview');
@@ -22,7 +17,6 @@
     const connText = $('conn-text');
 
     const state = {
-        participantName: cfg.participant ? cfg.participant.name : '',
         socket: null,
         stream: null,
         canvas: null,
@@ -30,34 +24,20 @@
         videoEl: null,
         captureTimer: null,
         sent: 0,
-        lastSentTs: 0,
         connected: false,
-        // Звуковой сигнал
         audioCtx: null,
         beepTimer: null,
     };
 
-    // ----- UI helpers -----
-    function show(el) {
-        el.classList.remove('hidden');
-    }
-    function hide(el) {
-        el.classList.add('hidden');
-    }
-    function setStep(name) {
-        hide(stepName);
-        hide(stepShare);
-        hide(stepRecording);
-        if (name === 'name') show(stepName);
-        if (name === 'share') show(stepShare);
-        if (name === 'recording') show(stepRecording);
-    }
-    function setConn(state) {
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    function setConn(s) {
         connStatus.classList.remove('conn-connected', 'conn-disconnected', 'conn-warn');
-        if (state === 'ok') {
+        if (s === 'ok') {
             connStatus.classList.add('conn-connected');
             connText.textContent = 'Подключено';
-        } else if (state === 'warn') {
+        } else if (s === 'warn') {
             connStatus.classList.add('conn-warn');
             connText.textContent = 'Переподключение…';
         } else {
@@ -66,16 +46,13 @@
         }
     }
 
-    // ----- Звуковой сигнал -----
-    // Создаётся только после первого user gesture (клика), чтобы обойти autoplay.
+    // ----- Звуковой сигнал при потере связи -----
     function ensureAudio() {
         if (state.audioCtx) return;
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             state.audioCtx = new Ctx();
-        } catch {
-            state.audioCtx = null;
-        }
+        } catch { state.audioCtx = null; }
     }
     function beep() {
         if (!state.audioCtx) return;
@@ -85,11 +62,9 @@
         const g = ctx.createGain();
         o.type = 'sine';
         o.frequency.value = 880;
-        g.gain.value = 0.0;
         o.connect(g);
         g.connect(ctx.destination);
         const t = ctx.currentTime;
-        // Короткий "бип-бип"
         g.gain.setValueAtTime(0, t);
         g.gain.linearRampToValueAtTime(0.25, t + 0.02);
         g.gain.setValueAtTime(0.25, t + 0.1);
@@ -106,28 +81,10 @@
         state.beepTimer = setInterval(beep, 3000);
     }
     function stopBeeping() {
-        if (state.beepTimer) {
-            clearInterval(state.beepTimer);
-            state.beepTimer = null;
-        }
+        if (state.beepTimer) { clearInterval(state.beepTimer); state.beepTimer = null; }
     }
 
-    // ----- Join (POST к API, ставит cookie) -----
-    async function join(name) {
-        const res = await fetch('/api/exam/' + encodeURIComponent(cfg.code) + '/join', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ name }),
-        });
-        if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.error || 'Ошибка подключения (HTTP ' + res.status + ')');
-        }
-        return res.json();
-    }
-
-    // ----- Запуск демонстрации экрана -----
+    // ----- Захват экрана -----
     async function startSharing() {
         ensureAudio();
         try {
@@ -148,24 +105,19 @@
         state.videoEl = video;
         preview.srcObject = state.stream;
 
-        const canvas = document.createElement('canvas');
-        state.canvas = canvas;
-        state.ctx = canvas.getContext('2d');
+        state.canvas = document.createElement('canvas');
+        state.ctx = state.canvas.getContext('2d');
 
-        // Обработка остановки участником через UI браузера ("Stop sharing").
         state.stream.getVideoTracks().forEach((t) => {
             t.addEventListener('ended', () => {
-                recStatus.textContent =
-                    'Демонстрация остановлена. Перезагрузите страницу, чтобы возобновить.';
-                if (state.captureTimer) {
-                    clearInterval(state.captureTimer);
-                    state.captureTimer = null;
-                }
+                recStatus.textContent = 'Демонстрация остановлена. Перезагрузите страницу, чтобы возобновить.';
+                if (state.captureTimer) { clearInterval(state.captureTimer); state.captureTimer = null; }
             });
         });
 
         connectSocket();
-        setStep('recording');
+        hide(stepShare);
+        show(stepRecording);
         startCaptureLoop();
     }
 
@@ -199,16 +151,11 @@
             });
             if (ack.ok) {
                 state.sent++;
-                state.lastSentTs = Date.now();
                 framesSent.textContent = String(state.sent);
-                lastFrame.textContent = new Date(state.lastSentTs).toLocaleTimeString('ru-RU');
+                lastFrame.textContent = new Date().toLocaleTimeString('ru-RU');
                 recStatus.textContent = 'Идёт передача';
-            } else {
-                if (ack.reason === 'rate_limited') {
-                    // Это норма — просто пропустим этот кадр.
-                } else {
-                    recStatus.textContent = 'Кадр не принят: ' + ack.reason;
-                }
+            } else if (ack.reason !== 'rate_limited') {
+                recStatus.textContent = 'Кадр не принят: ' + ack.reason;
             }
         } catch {
             recStatus.textContent = 'Ошибка отправки кадра';
@@ -226,16 +173,8 @@
         });
         state.socket = socket;
 
-        socket.on('connect', () => {
-            state.connected = true;
-            setConn('ok');
-            stopBeeping();
-        });
-        socket.on('disconnect', () => {
-            state.connected = false;
-            setConn('off');
-            startBeeping();
-        });
+        socket.on('connect', () => { state.connected = true; setConn('ok'); stopBeeping(); });
+        socket.on('disconnect', () => { state.connected = false; setConn('off'); startBeeping(); });
         socket.on('connect_error', (err) => {
             state.connected = false;
             setConn('warn');
@@ -245,96 +184,34 @@
         socket.io.on('reconnect_attempt', () => setConn('warn'));
 
         socket.on('kicked', (info) => {
-            // Сервер сказал отключиться (например, экзамен завершён).
             const reason = info && info.reason ? info.reason : 'unknown';
-            const msg =
-                reason === 'exam_finished'
-                    ? 'Экзамен завершён преподавателем. Передача остановлена.'
-                    : 'Соединение разорвано сервером (' + reason + ').';
-            recStatus.textContent = msg;
-            if (state.captureTimer) {
-                clearInterval(state.captureTimer);
-                state.captureTimer = null;
-            }
+            recStatus.textContent = reason === 'exam_finished'
+                ? 'Экзамен завершён преподавателем. Передача остановлена.'
+                : 'Соединение разорвано сервером (' + reason + ').';
+            if (state.captureTimer) { clearInterval(state.captureTimer); state.captureTimer = null; }
             if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
-            // Не реконнектимся.
             socket.io.opts.reconnection = false;
             socket.disconnect();
             stopBeeping();
         });
     }
 
-    // ----- Wiring -----
-    if (cfg.participant) {
-        helloName.textContent = state.participantName;
-        setStep('share');
-    } else {
-        setStep('name');
-    }
-
-    if (nameForm) {
-        nameForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            nameError.classList.add('hidden');
-            const name = nameInput.value.trim();
-            if (!name) {
-                nameError.textContent = 'Введите имя';
-                nameError.classList.remove('hidden');
-                return;
-            }
-            try {
-                const data = await join(name);
-                state.participantName = data.participant.name;
-                helloName.textContent = state.participantName;
-                setStep('share');
-            } catch (err) {
-                nameError.textContent = err.message;
-                nameError.classList.remove('hidden');
-            }
-        });
-    }
-
-    startBtn.addEventListener('click', () => {
-        if (cfg.requireGeekclass) {
-            startSharing();
-            return;
-        }
-        // Если cookie уже есть, но в БД participant'а нет (например, экзамен пересоздали),
-        // socket connect упадёт с no_token. Перед стартом ещё раз обновим join.
-        join(state.participantName)
-            .then(startSharing)
-            .catch((err) => {
-                alert('Не удалось подтвердить участника: ' + err.message);
-            });
-    });
+    startBtn.addEventListener('click', startSharing);
 
     leaveBtn.addEventListener('click', async () => {
         if (!confirm('Завершить демонстрацию и покинуть экзамен?')) return;
-        try {
-            if (state.socket) state.socket.emit('leave');
-        } catch {
-            /* ignore */
-        }
+        try { if (state.socket) state.socket.emit('leave'); } catch { /* ignore */ }
         try {
             await fetch('/api/exam/' + encodeURIComponent(cfg.code) + '/leave', {
-                method: 'POST',
-                credentials: 'same-origin',
+                method: 'POST', credentials: 'same-origin',
             });
-        } catch {
-            /* ignore */
-        }
+        } catch { /* ignore */ }
         if (state.stream) state.stream.getTracks().forEach((t) => t.stop());
         if (state.captureTimer) clearInterval(state.captureTimer);
         location.href = '/';
     });
 
-    // Если страница закрывается — попытаемся уведомить сервер об отключении.
-    // Это best-effort.
     window.addEventListener('beforeunload', () => {
-        try {
-            if (state.socket) state.socket.disconnect();
-        } catch {
-            /* ignore */
-        }
+        try { if (state.socket) state.socket.disconnect(); } catch { /* ignore */ }
     });
 })();

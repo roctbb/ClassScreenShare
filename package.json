@@ -21,7 +21,6 @@
     "manage": "node scripts/manage.js"
   },
   "dependencies": {
-    "bcrypt": "6.0.0",
     "connect-pg-simple": "9.0.1",
     "cookie": "0.7.2",
     "cookie-parser": "1.4.7",

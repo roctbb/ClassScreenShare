@@ -4,10 +4,13 @@
 /**
  * CLI для управления приложением.
  *
+ * Авторизация в системе работает только через GeekClass — локальные пароли
+ * не используются. Эти команды позволяют посмотреть список пользователей и
+ * вручную поменять роль (например, дать teacher → admin).
+ *
  * Команды:
- *   create-admin <login> <password>   создать локального админа
- *   list-admins                        вывести список локальных админов
- *   reset-password <login> <password>  сменить пароль локальному админу
+ *   list-users                       вывести список пользователей
+ *   set-role <userId> <role>         изменить роль (teacher | admin)
  */
 
 const path = require('path');
@@ -28,28 +31,12 @@ async function withDb(fn) {
     }
 }
 
-async function createAdmin([login, password, ...rest]) {
-    if (!login || !password) {
-        console.error('Usage: manage.js create-admin <login> <password>');
-        process.exit(1);
-    }
-    if (rest.length) {
-        console.error('Too many arguments');
-        process.exit(1);
-    }
-    await withDb(async () => {
-        const usersService = require('../src/services/users');
-        const user = await usersService.createLocalAdmin({ login, password });
-        console.log(`Admin created: id=${user.id} login=${user.login}`);
-    });
-}
-
-async function listAdmins() {
+async function listUsers() {
     await withDb(async () => {
         const { User } = require('../src/db/models');
         const users = await User.findAll({
             order: [['id', 'ASC']],
-            attributes: ['id', 'login', 'provider', 'name', 'role', 'lastLoginAt'],
+            attributes: ['id', 'login', 'provider', 'externalId', 'name', 'role', 'lastLoginAt'],
         });
         if (!users.length) {
             console.log('(no users)');
@@ -59,26 +46,34 @@ async function listAdmins() {
     });
 }
 
-async function resetPassword([login, password, ...rest]) {
-    if (!login || !password) {
-        console.error('Usage: manage.js reset-password <login> <password>');
+async function setRole([userIdStr, role, ...rest]) {
+    if (!userIdStr || !role) {
+        console.error('Usage: manage.js set-role <userId> <admin|teacher>');
         process.exit(1);
     }
     if (rest.length) {
         console.error('Too many arguments');
         process.exit(1);
     }
+    if (role !== 'admin' && role !== 'teacher') {
+        console.error('Role must be "admin" or "teacher"');
+        process.exit(1);
+    }
+    const userId = Number(userIdStr);
+    if (!Number.isInteger(userId) || userId <= 0) {
+        console.error('userId must be a positive integer');
+        process.exit(1);
+    }
     await withDb(async () => {
         const { User } = require('../src/db/models');
-        const usersService = require('../src/services/users');
-        const user = await User.findOne({ where: { provider: 'local', login } });
+        const user = await User.findByPk(userId);
         if (!user) {
-            console.error(`User not found: provider=local login=${login}`);
+            console.error(`User not found: id=${userId}`);
             process.exit(1);
         }
-        user.passwordHash = await usersService.hashPassword(password);
+        user.role = role;
         await user.save();
-        console.log(`Password updated for ${login}`);
+        console.log(`Role updated: id=${user.id} login=${user.login} role=${user.role}`);
     });
 }
 
@@ -86,14 +81,12 @@ async function main() {
     const [cmd, ...args] = process.argv.slice(2);
     try {
         switch (cmd) {
-            case 'create-admin':
-                await createAdmin(args);
+            case 'list-users':
+            case 'list-admins': // legacy alias
+                await listUsers();
                 break;
-            case 'list-admins':
-                await listAdmins();
-                break;
-            case 'reset-password':
-                await resetPassword(args);
+            case 'set-role':
+                await setRole(args);
                 break;
             case undefined:
             case '--help':
@@ -103,10 +96,12 @@ async function main() {
                     [
                         'Usage: npm run manage <command>',
                         '',
+                        'Authentication is GeekClass-only — there are no local passwords.',
+                        'Users are upserted from GeekClass JWT on first login.',
+                        '',
                         'Commands:',
-                        '  create-admin <login> <password>     create a local admin user',
-                        '  list-admins                          list all users',
-                        '  reset-password <login> <password>   reset local admin password',
+                        '  list-users                     list all users',
+                        '  set-role <userId> <role>       change user role (admin | teacher)',
                     ].join('\n')
                 );
                 break;

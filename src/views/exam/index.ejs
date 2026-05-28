@@ -9,49 +9,11 @@
         </div>
     </header>
 
-    <!-- Этап 1: ввод имени -->
-    <section id="step-name" class="card<%= participant ? ' hidden' : '' %>">
-        <h2>Подключение к экзамену</h2>
-        <p class="muted">
-            <% if (requireGeekclass) { %>Для этого экзамена нужен вход через GeekClass. После
-            авторизации не закрывайте вкладку до конца экзамена.<% } else { %>Войдите через
-            GeekClass или введите фамилию и имя вручную. После начала демонстрации экрана не
-            закрывайте эту вкладку до конца экзамена.<% } %>
-        </p>
-        <% if (geekclassEnabled) { %>
-        <a class="btn auth-btn-block exam-geekclass-btn" href="/exam/<%= exam.code %>/geekclass">
-            Войти через GeekClass
-        </a>
-        <% if (!requireGeekclass) { %>
-        <div class="auth-divider exam-auth-divider"><span>или</span></div>
-        <% } %> <% } %> <% if (!requireGeekclass) { %>
-        <form id="name-form">
-            <div class="form-group">
-                <label for="name">Имя</label>
-                <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    placeholder="Иванов Иван"
-                    required
-                    maxlength="120"
-                    autocomplete="name"
-                    autofocus
-                    value="<%= participant ? participant.name : '' %>"
-                />
-            </div>
-            <div id="name-error" class="alert alert-error hidden"></div>
-            <button type="submit" class="btn">Продолжить</button>
-        </form>
-        <% } %>
-    </section>
-
-    <!-- Этап 2: захват экрана -->
-    <section id="step-share" class="card<%= participant ? '' : ' hidden' %>">
+    <!-- Этап 2: захват экрана (участник уже авторизован через GeekClass) -->
+    <section id="step-share" class="card">
         <h2>Готовы поделиться экраном?</h2>
         <p>
-            Здравствуйте,
-            <strong id="hello-name"><%= participant ? participant.name : '' %></strong>.
+            Здравствуйте, <strong><%= participant.name %></strong>.
         </p>
         <p>
             При нажатии кнопки браузер попросит выбрать, что показывать. Выберите
@@ -90,8 +52,7 @@
         captureInterval: <%= captureInterval %>,
         imageQuality: <%= imageQuality %>,
         imageWidth: <%= imageWidth %>,
-        requireGeekclass: <%= requireGeekclass ? 'true' : 'false' %>,
-        participant: <%- participant ? JSON.stringify({ id: participant.id, name: participant.name }) : 'null' %>
+        participant: <%- JSON.stringify({ id: participant.id, name: participant.name }) %>
     };
 </script>
 <script src="/js/exam.js?v=<%= assetVersion %>"></script>

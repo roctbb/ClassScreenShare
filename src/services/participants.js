@@ -1,59 +1,39 @@
 'use strict';
 
-const crypto = require('crypto');
 const { Participant } = require('../db/models');
 
-const TOKEN_BYTES = 24; // 32 base64url-символа
-
-function generateToken() {
-    return crypto.randomBytes(TOKEN_BYTES).toString('base64url');
-}
-
 /**
- * Найти существующего participant по exam_id и token (если cookie есть).
- * Возвращает Participant или null.
+ * Найти или создать participant по geekclass_id (дедупликация).
+ * Если участник с таким geekclass_id уже есть в этом экзамене — обновляем имя и возвращаем.
  */
-async function findByToken(examId, token) {
-    if (!token || typeof token !== 'string') return null;
-    return Participant.findOne({ where: { examId, token } });
-}
-
-/**
- * Найти или создать participant.
- * Если передан валидный token (привязан к этому экзамену) — обновляем имя и
- * возвращаем существующего. Иначе — создаём нового.
- */
-async function joinOrResume({ examId, name, token, ip = null, userAgent = null }) {
+async function joinOrResume({ examId, name, geekclassId, ip = null, userAgent = null }) {
     const trimmed = String(name || '').trim();
     if (!trimmed) {
         const err = new Error('name is required');
         err.status = 400;
         throw err;
     }
-    if (trimmed.length > 255) {
-        const err = new Error('name is too long');
+    if (!geekclassId) {
+        const err = new Error('geekclassId is required');
         err.status = 400;
         throw err;
     }
 
-    if (token) {
-        const existing = await findByToken(examId, token);
-        if (existing) {
-            // Если имя поменялось — обновим. Это нормальный кейс при reconnect
-            // если человек открыл ссылку заново и ввёл имя.
-            if (existing.name !== trimmed) {
-                existing.name = trimmed;
-            }
-            existing.leftAt = null;
-            await existing.save();
-            return { participant: existing, resumed: true };
-        }
+    // Дедупликация по geekclass_id.
+    const existing = await Participant.findOne({
+        where: { examId, geekclassId: String(geekclassId) },
+    });
+    if (existing) {
+        existing.name = trimmed;
+        existing.leftAt = null;
+        await existing.save();
+        return { participant: existing, resumed: true };
     }
 
     const participant = await Participant.create({
         examId,
         name: trimmed,
-        token: generateToken(),
+        geekclassId: String(geekclassId),
         joinedAt: new Date(),
         ip,
         userAgent: userAgent ? String(userAgent).slice(0, 512) : null,
@@ -74,10 +54,43 @@ async function leave(participantId) {
 
 /**
  * Обновить lastSeenAt (вызывается при каждом полученном кадре).
- * Делаем UPDATE без загрузки модели, чтобы не нагружать БД.
+ * Throttled per participant — БД обновляется не чаще раза в TOUCH_INTERVAL_MS.
  */
+const TOUCH_INTERVAL_MS = 5000;
+const lastTouchAt = new Map(); // participantId -> ms
+const pendingTouch = new Map(); // participantId -> latest ts
+
 async function touch(participantId, ts = new Date()) {
-    await Participant.update({ lastSeenAt: ts }, { where: { id: participantId } });
+    const now = Date.now();
+    const last = lastTouchAt.get(participantId) || 0;
+    pendingTouch.set(participantId, ts);
+    if (now - last < TOUCH_INTERVAL_MS) {
+        return;
+    }
+    lastTouchAt.set(participantId, now);
+    const tsToWrite = pendingTouch.get(participantId);
+    pendingTouch.delete(participantId);
+    await Participant.update({ lastSeenAt: tsToWrite }, { where: { id: participantId } });
 }
 
-module.exports = { generateToken, findByToken, joinOrResume, leave, touch };
+/**
+ * Финальный flush для участника при отключении — пишет последний pending ts.
+ */
+async function flushTouch(participantId) {
+    const ts = pendingTouch.get(participantId);
+    pendingTouch.delete(participantId);
+    lastTouchAt.delete(participantId);
+    if (ts) {
+        await Participant.update({ lastSeenAt: ts }, { where: { id: participantId } });
+    }
+}
+
+/**
+ * Найти участника по geekclass_id в рамках экзамена.
+ */
+async function findByGeekclassId(examId, geekclassId) {
+    if (!geekclassId) return null;
+    return Participant.findOne({ where: { examId, geekclassId: String(geekclassId) } });
+}
+
+module.exports = { joinOrResume, leave, touch, flushTouch, findByGeekclassId };

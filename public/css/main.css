@@ -614,6 +614,7 @@ label {
 
 .participant-summary {
     margin-bottom: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .participant-jump-row {
@@ -1333,4 +1334,292 @@ label {
 
 .timeline-tooltip strong {
     color: #fca5a5;
+}
+
+/* ----- Player exam time overlay & gap indicator ----- */
+.player-wrap {
+    position: relative;
+}
+
+.player-exam-time {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 6px 16px;
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.gap-indicator {
+    background: #fef2f2;
+    color: var(--danger);
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.player-actions {
+    padding: 0 16px 14px;
+    display: flex;
+    gap: 8px;
+}
+
+/* ----- Live inline (merged exam+live page) ----- */
+.live-inline-card {
+    padding: 16px;
+}
+
+.live-inline-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.live-inline-header h2 {
+    margin: 0;
+}
+
+/* ----- Compact exam page ----- */
+.exam-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.exam-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.exam-title-group h1 {
+    margin: 0;
+    font-size: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.exam-rename-form {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+}
+
+.exam-rename-form input[type='text'] {
+    min-height: 34px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.exam-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    padding: 4px 8px;
+    min-width: 32px;
+    text-align: center;
+}
+
+/* Инфополоса */
+.exam-infobar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.exam-infobar-invite {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.invite-input {
+    width: 260px;
+    min-height: 32px;
+    font-size: 13px;
+    padding: 4px 8px;
+}
+
+.exam-infobar-stats {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    flex-wrap: wrap;
+}
+
+.exam-params-details {
+    margin-left: auto;
+    font-size: 13px;
+}
+
+.exam-params-details summary {
+    cursor: pointer;
+    user-select: none;
+}
+
+.exam-params-kv {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+/* Live header compact */
+.live-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.live-search-compact {
+    width: 160px;
+    min-height: 32px;
+    padding: 4px 8px;
+    font-size: 13px;
+}
+
+/* Participants table compact */
+.participants-table .participant-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.participant-meta {
+    font-size: 12px;
+}
+
+.participants-table td {
+    padding: 8px 10px;
+}
+
+.participants-table .table-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+/* ----- Connection log as collapsible details ----- */
+.connection-log-details {
+    padding: 12px 16px;
+}
+
+.connection-log-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+    list-style: none;
+    user-select: none;
+}
+
+.connection-log-summary::-webkit-details-marker { display: none; }
+
+.connection-log-details[open] .connection-log-summary {
+    margin-bottom: 12px;
+}
+
+.connection-log-details .table-shell {
+    margin-top: 8px;
+}
+
+.user-role {
+    display: inline-block;
+    margin-left: 5px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: #eef2ff;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+.participants-table .participant-name-cell > span:first-child {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+.screen-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* ----- Toast notifications ----- */
+.toast-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    background: #1f2937;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: auto;
+    max-width: 320px;
+}
+
+.toast-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-success {
+    background: var(--success);
+}
+
+.toast-warn {
+    background: var(--warning);
+}
+
+.toast-info {
+    background: var(--accent);
 }

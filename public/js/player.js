@@ -7,7 +7,6 @@
     const $ = (id) => document.getElementById(id);
 
     const SPEEDS = [0.5, 1, 1.5, 2, 4, 8];
-    const player = $('player');
     const slideImg = $('slideshow-img');
     const playPauseBtn = $('play-pause');
     const speedsBox = $('speeds');
@@ -16,10 +15,21 @@
     const tlSvg = $('timeline');
     const tlTooltip = $('tl-tooltip');
     const tlWrap = tlSvg && tlSvg.parentElement;
+    const examTimeOverlay = $('exam-time-overlay');
+    const gapIndicator = $('gap-indicator');
 
-    let timeline = null; // { totalDurationMs, frames, gaps, ... }
+    let timeline = null;
     let durationMs = 0;
     let speed = 1;
+
+    const state = {
+        frames: [],
+        currentMs: 0,
+        playing: false,
+        lastTickAt: 0,
+        currentImgIdx: -1,
+        rafId: null,
+    };
 
     // ------------------- Utils -------------------
     function fmtTime(ms) {
@@ -29,7 +39,17 @@
         const r = s % 60;
         return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
     }
-    function buildSpeedButtons(onChange) {
+
+    function fmtExamTime(ms) {
+        if (!isFinite(ms) || ms < 0) ms = 0;
+        const s = Math.floor(ms / 1000);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const r = s % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+    }
+
+    function buildSpeedButtons() {
         speedsBox.innerHTML = '';
         SPEEDS.forEach((sp) => {
             const b = document.createElement('button');
@@ -42,55 +62,41 @@
                 speedsBox
                     .querySelectorAll('button')
                     .forEach((x) => x.classList.toggle('active', Number(x.dataset.speed) === sp));
-                onChange(sp);
             });
             speedsBox.appendChild(b);
         });
     }
 
-    // ------------------- Timeline -------------------
-    /**
-     * Рендерит SVG-таймлайн:
-     *   - зелёный фон по всей длине (есть кадры)
-     *   - красные блоки на gaps
-     *   - индикатор текущей позиции
-     */
+    // ------------------- Timeline SVG -------------------
     function renderTimeline() {
         if (!timeline || !timeline.totalDurationMs) return;
         const total = timeline.totalDurationMs;
         const W = 1000;
         const H = 40;
-        const parts = [
-            `<rect x="0" y="8" width="${W}" height="${H - 16}" rx="4" fill="#10b981" />`,
-        ];
+        const parts = [`<rect x="0" y="8" width="${W}" height="${H - 16}" rx="4" fill="#10b981" />`];
         for (const gap of timeline.gaps || []) {
             const x = (gap.startMs / total) * W;
-            const w = ((gap.endMs - gap.startMs) / total) * W;
+            const w = Math.max(2, ((gap.endMs - gap.startMs) / total) * W);
             const real = Math.round(gap.realDurationMs / 1000);
             parts.push(
-                `<rect class="tl-gap" x="${x}" y="8" width="${w}" height="${H - 16}" fill="#ef4444"
-                    data-real="${real}" data-startms="${gap.startMs}" data-endms="${gap.endMs}" />`
+                `<rect class="tl-gap" x="${x}" y="8" width="${w}" height="${H - 16}" fill="#ef4444"` +
+                    ` data-real="${real}" data-startms="${gap.startMs}" data-endms="${gap.endMs}" />`
             );
         }
-        // Индикатор позиции.
         parts.push(
             `<line id="tl-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#1f2937" stroke-width="2" />`
         );
         tlSvg.innerHTML = parts.join('');
 
-        // Tooltip + click + cursor.
         tlSvg.addEventListener('click', (e) => {
             const rect = tlSvg.getBoundingClientRect();
             const ratio = (e.clientX - rect.left) / rect.width;
-            const targetMs = Math.max(0, Math.min(total, ratio * total));
-            seekTo(targetMs);
+            seekTo(Math.max(0, Math.min(total, ratio * total)));
         });
         tlSvg.addEventListener('mousemove', (e) => {
             const rect = tlSvg.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const ratio = x / rect.width;
+            const ratio = (e.clientX - rect.left) / rect.width;
             const ms = Math.max(0, Math.min(total, ratio * total));
-            // Если над gap'ом — показать про связь.
             const target = e.target;
             if (target && target.classList && target.classList.contains('tl-gap')) {
                 const real = target.getAttribute('data-real');
@@ -115,163 +121,124 @@
     }
 
     function seekTo(ms) {
-        if (cfg.mode === 'video') {
-            player.currentTime = ms / 1000;
-        } else {
-            slideshowState.currentMs = ms;
-            updateSlideshow();
+        state.currentMs = ms;
+        updateSlideshow();
+    }
+
+    // ------------------- Gap detection -------------------
+    function isInGap(ms) {
+        if (!timeline || !timeline.gaps) return false;
+        for (const gap of timeline.gaps) {
+            if (ms >= gap.startMs && ms < gap.endMs) return true;
         }
+        return false;
     }
 
-    // ------------------- Video mode -------------------
-    async function initVideo() {
-        try {
-            const r = await fetch(cfg.timelineUrl, { credentials: 'same-origin' });
-            if (r.ok) {
-                timeline = await r.json();
-                durationMs = timeline.totalDurationMs;
-            }
-        } catch (e) {
-            console.warn('No timeline json, falling back to video duration only', e);
-        }
-
-        // Если нет таймлайна — построим минимальный из durations.
-        player.addEventListener('loadedmetadata', () => {
-            if (!timeline) {
-                durationMs = Math.round(player.duration * 1000);
-                timeline = { totalDurationMs: durationMs, gaps: [], frames: [] };
-            }
-            totalTimeEl.textContent = fmtTime(durationMs);
-            renderTimeline();
-        });
-        player.addEventListener('timeupdate', () => {
-            setCursor(player.currentTime * 1000);
-        });
-
-        buildSpeedButtons((sp) => {
-            player.playbackRate = sp;
-        });
-    }
-
-    // ------------------- Slideshow mode -------------------
-    const slideshowState = {
-        frames: [],
-        timeline: null,
-        currentMs: 0,
-        playing: false,
-        lastTickAt: 0,
-        currentImgIdx: -1,
-        rafId: null,
-    };
-
-    async function initSlideshow() {
-        // Получим список кадров.
-        const r = await fetch(cfg.framesUrl, { credentials: 'same-origin' });
-        if (!r.ok) return;
-        const data = await r.json();
-        slideshowState.frames = data.frames;
-
-        if (slideshowState.frames.length === 0) return;
-
-        // Построим таймлайн на клиенте (та же логика что и в server side video.js).
-        timeline = buildClientTimeline(slideshowState.frames);
-        durationMs = timeline.totalDurationMs;
-        slideshowState.timeline = timeline;
-        totalTimeEl.textContent = fmtTime(durationMs);
-        renderTimeline();
-        // Покажем первый кадр.
-        showFrameAt(0);
-
-        playPauseBtn.addEventListener('click', () => {
-            if (slideshowState.playing) {
-                slideshowState.playing = false;
-                playPauseBtn.textContent = 'Воспроизвести';
-                if (slideshowState.rafId) cancelAnimationFrame(slideshowState.rafId);
-            } else {
-                if (slideshowState.currentMs >= durationMs) slideshowState.currentMs = 0;
-                slideshowState.playing = true;
-                playPauseBtn.textContent = 'Пауза';
-                slideshowState.lastTickAt = performance.now();
-                tickSlideshow();
-            }
-        });
-
-        buildSpeedButtons(() => {
-            /* speed читается из state */
-        });
-    }
-
+    // ------------------- Slideshow -------------------
     function buildClientTimeline(frames) {
-        const fps = 2;
-        const maxGapMs = 5 * 1000; // те же дефолты что и на сервере
-        const defaultDurationMs = Math.round(1000 / fps);
+        const maxGapMs = (cfg.maxGapSeconds || 5) * 1000;
+        const defaultDurationMs = 500; // 2fps
         const result = [];
         const gaps = [];
-        let videoOffsetMs = 0;
+        let offset = 0;
         for (let i = 0; i < frames.length; i++) {
             const cur = frames[i];
             const next = frames[i + 1];
-            let durationMs;
+            let d;
             if (next) {
                 const realGap = next.ts - cur.ts;
-                durationMs = Math.min(realGap, maxGapMs);
+                d = Math.min(realGap, maxGapMs);
                 if (realGap > maxGapMs) {
-                    gaps.push({
-                        startMs: videoOffsetMs,
-                        endMs: videoOffsetMs + durationMs,
-                        realDurationMs: realGap,
-                    });
+                    gaps.push({ startMs: offset, endMs: offset + d, realDurationMs: realGap });
                 }
             } else {
-                durationMs = defaultDurationMs;
+                d = defaultDurationMs;
             }
-            if (durationMs < defaultDurationMs) durationMs = defaultDurationMs;
-            result.push({ id: cur.id, ts: cur.ts, vo: videoOffsetMs, d: durationMs });
-            videoOffsetMs += durationMs;
+            if (d < defaultDurationMs) d = defaultDurationMs;
+            result.push({ id: cur.id, ts: cur.ts, vo: offset, d });
+            offset += d;
         }
-        return { totalDurationMs: videoOffsetMs, frames: result, gaps };
+        return { totalDurationMs: offset, frames: result, gaps };
     }
 
     function showFrameAt(ms) {
-        const frames = slideshowState.timeline.frames;
-        // Найдём кадр, у которого vo <= ms < vo+d.
-        let idx = 0;
+        const frames = timeline.frames;
+        let idx = frames.length - 1;
         for (let i = 0; i < frames.length; i++) {
             if (ms >= frames[i].vo && ms < frames[i].vo + frames[i].d) {
                 idx = i;
                 break;
             }
-            if (i === frames.length - 1 && ms >= frames[i].vo) idx = i;
         }
-        if (idx !== slideshowState.currentImgIdx) {
-            slideshowState.currentImgIdx = idx;
+        if (idx !== state.currentImgIdx) {
+            state.currentImgIdx = idx;
             slideImg.src = cfg.frameUrlBase + frames[idx].id;
         }
         setCursor(ms);
+
+        // Время от начала экзамена.
+        if (examTimeOverlay && cfg.examStartedAt) {
+            const frameTs = frames[idx].ts;
+            const elapsed = frameTs - cfg.examStartedAt;
+            examTimeOverlay.textContent = fmtExamTime(Math.max(0, elapsed));
+        }
+
+        // Индикация пропуска.
+        if (gapIndicator) {
+            gapIndicator.classList.toggle('hidden', !isInGap(ms));
+        }
     }
 
     function updateSlideshow() {
-        showFrameAt(slideshowState.currentMs);
+        showFrameAt(state.currentMs);
     }
 
-    function tickSlideshow() {
-        if (!slideshowState.playing) return;
+    function tick() {
+        if (!state.playing) return;
         const now = performance.now();
-        const dt = (now - slideshowState.lastTickAt) * speed;
-        slideshowState.lastTickAt = now;
-        slideshowState.currentMs += dt;
-        if (slideshowState.currentMs >= durationMs) {
-            slideshowState.currentMs = durationMs;
-            slideshowState.playing = false;
+        const dt = (now - state.lastTickAt) * speed;
+        state.lastTickAt = now;
+        state.currentMs += dt;
+        if (state.currentMs >= durationMs) {
+            state.currentMs = durationMs;
+            state.playing = false;
             playPauseBtn.textContent = 'Воспроизвести';
             updateSlideshow();
             return;
         }
         updateSlideshow();
-        slideshowState.rafId = requestAnimationFrame(tickSlideshow);
+        state.rafId = requestAnimationFrame(tick);
     }
 
-    // ------------------- Init -------------------
-    if (cfg.mode === 'video') initVideo();
-    else if (cfg.mode === 'slideshow') initSlideshow();
+    async function init() {
+        const r = await fetch(cfg.framesUrl, { credentials: 'same-origin' });
+        if (!r.ok) return;
+        const data = await r.json();
+        state.frames = data.frames;
+        if (state.frames.length === 0) return;
+
+        timeline = buildClientTimeline(state.frames);
+        durationMs = timeline.totalDurationMs;
+        totalTimeEl.textContent = fmtTime(durationMs);
+        renderTimeline();
+        showFrameAt(0);
+
+        playPauseBtn.addEventListener('click', () => {
+            if (state.playing) {
+                state.playing = false;
+                playPauseBtn.textContent = 'Воспроизвести';
+                if (state.rafId) cancelAnimationFrame(state.rafId);
+            } else {
+                if (state.currentMs >= durationMs) state.currentMs = 0;
+                state.playing = true;
+                playPauseBtn.textContent = 'Пауза';
+                state.lastTickAt = performance.now();
+                tick();
+            }
+        });
+
+        buildSpeedButtons();
+    }
+
+    init();
 })();

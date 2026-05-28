@@ -99,10 +99,24 @@
             ['pending', 'running'].includes(row.dataset.recordingStatus)
         ).length;
         const failed = rows.filter((row) => row.dataset.recordingStatus === 'failed').length;
+
         setText('summary-video-ready', ready);
-        setText('summary-video-converting', converting);
-        setText('summary-video-failed', failed);
-        document.querySelector('.summary-danger')?.classList.toggle('hidden', failed === 0);
+
+        const convertingEl = document.getElementById('summary-video-converting');
+        if (convertingEl) {
+            if (converting > 0) {
+                convertingEl.classList.remove('hidden');
+                convertingEl.textContent = `${converting} конв.`;
+            } else {
+                convertingEl.classList.add('hidden');
+                convertingEl.textContent = '';
+            }
+        }
+
+        const failedEl = document.getElementById('summary-video-failed');
+        const failedWrap = failedEl ? failedEl.closest('.summary-danger') : null;
+        if (failedEl) failedEl.textContent = String(failed);
+        if (failedWrap) failedWrap.classList.toggle('hidden', failed === 0);
     }
 
     function setText(id, value) {

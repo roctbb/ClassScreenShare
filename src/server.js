@@ -30,10 +30,6 @@ async function bootstrap() {
     // запросов). Сам require() инициализирует Sequelize-модели.
     require('./db/models');
 
-    // Создаём первого админа из env, если таблица users пустая.
-    const usersService = require('./services/users');
-    await usersService.bootstrapFromEnv(config.adminBootstrap);
-
     const app = express();
 
     // Доверяем заголовкам X-Forwarded-* от nginx/load-balancer.
@@ -88,12 +84,12 @@ async function bootstrap() {
     app.use('/auth', csrfGuard, require('./routes/auth'));
 
     // Публичная зона участника (страница экзамена и API join/leave).
-    // CSRF не накладываем — у участника нет сессии (используется cs.participant).
+    // CSRF не накладываем — у участника нет сессии (используется cs.participant.pid cookie).
     const examRoute = require('./routes/exam');
     app.use(examRoute.router);
 
     // Админ-зона. CSRF guard только тут — на /api/exam/* участников он не нужен,
-    // там нет сессии (используется cs.participant cookie).
+    // там нет сессии (используется cs.participant.pid cookie).
     app.use('/admin', csrfGuard, require('./routes/admin'));
 
     app.get('/', (_req, res) => {
@@ -139,23 +135,25 @@ async function bootstrap() {
 
     // Подключаем namespace'ы.
     require('./sockets/publisher').attachPublisher(io);
-    require('./sockets/viewer').attachViewer(io, sessionMw);
+    const { staleTimer } = require('./sockets/viewer').attachViewer(io, sessionMw);
 
     server.listen(config.port, () => {
         logger.info({ url: config.publicUrl }, 'http server listening');
     });
 
-    setupGracefulShutdown(server, io);
+    setupGracefulShutdown(server, io, staleTimer);
 
     return { app, server, io };
 }
 
-function setupGracefulShutdown(server, io) {
+function setupGracefulShutdown(server, io, staleTimer) {
     let shuttingDown = false;
     const shutdown = async (signal) => {
         if (shuttingDown) return;
         shuttingDown = true;
         logger.info({ signal }, 'shutting down');
+
+        if (staleTimer) clearInterval(staleTimer);
 
         // Останавливаем приём новых соединений
         server.close((err) => {

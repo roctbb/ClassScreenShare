@@ -2,63 +2,33 @@
     <div class="page-header">
         <div>
             <h1>Экзамены</h1>
-            <p class="page-subtitle">
-                Создавайте экзамены, управляйте кодами и открывайте мониторинг.
-            </p>
+            <p class="page-subtitle">Создавайте экзамены, управляйте кодами и открывайте мониторинг.</p>
         </div>
     </div>
 
     <div class="card create-exam-card">
-        <div class="card-heading">
-            <h2>Создать экзамен</h2>
-            <span class="muted">Код можно оставить пустым.</span>
-        </div>
         <% if (createError === 'empty') { %>
         <div class="alert alert-error">Введите название экзамена.</div>
         <% } else if (createError === 'invalid') { %>
         <div class="alert alert-error">Некорректное название.</div>
         <% } else if (createError === 'bad_code') { %>
-        <div class="alert alert-error">
-            Код должен быть от 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание.
-        </div>
+        <div class="alert alert-error">Код должен быть от 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание.</div>
         <% } else if (createError === 'code_exists') { %>
         <div class="alert alert-error">Экзамен с таким кодом уже существует.</div>
         <% } %>
         <form method="post" action="/admin/exams" class="create-exam-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
             <div class="form-field form-field-grow">
-                <label for="exam-name">Название</label>
-                <input
-                    id="exam-name"
-                    type="text"
-                    name="name"
-                    placeholder="Например: Алгебра, 9 класс"
-                    required
-                    maxlength="255"
-                    autofocus
-                />
+                <input id="exam-name" type="text" name="name" placeholder="Название экзамена"
+                    required maxlength="255" autofocus />
             </div>
             <div class="form-field form-field-code">
-                <label for="exam-code">Код</label>
-                <input
-                    id="exam-code"
-                    type="text"
-                    name="code"
-                    placeholder="MATH-9"
-                    maxlength="16"
+                <input id="exam-code" type="text" name="code" placeholder="Код (необяз.)" maxlength="16"
                     pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,15}"
-                    title="От 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание"
-                />
+                    title="От 3 до 16 символов: латинские буквы, цифры, дефис или подчёркивание" />
             </div>
-            <label class="form-check geekclass-required-check" for="require-geekclass">
-                <input id="require-geekclass" type="checkbox" name="requireGeekclass" value="1" />
-                <span>
-                    <strong>Только через GeekClass</strong>
-                    <small>Ученика сразу отправит на авторизацию</small>
-                </span>
-            </label>
             <div class="form-actions">
-                <button type="submit" class="btn">Создать</button>
+                <button type="submit" class="btn">+ Создать</button>
             </div>
         </form>
     </div>
@@ -69,12 +39,7 @@
     <div class="exam-list-toolbar" aria-label="Фильтр списка экзаменов">
         <div class="exam-search">
             <label class="sr-only" for="exam-search-input">Найти экзамен</label>
-            <input
-                id="exam-search-input"
-                type="search"
-                placeholder="Найти по названию или коду"
-                autocomplete="off"
-            />
+            <input id="exam-search-input" type="search" placeholder="Найти по названию или коду" autocomplete="off" />
         </div>
         <div class="exam-filter">
             <label for="exam-status-filter">Статус</label>
@@ -85,14 +50,6 @@
                 <option value="finished">Завершённые</option>
             </select>
         </div>
-        <div class="exam-filter">
-            <label for="exam-auth-filter">Вход</label>
-            <select id="exam-auth-filter">
-                <option value="all">Любой</option>
-                <option value="geekclass">GeekClass</option>
-                <option value="manual">Имя вручную</option>
-            </select>
-        </div>
         <p class="exam-list-summary muted" id="exam-list-summary">Показаны все экзамены.</p>
     </div>
     <div class="table-shell">
@@ -101,7 +58,6 @@
                 <tr>
                     <th>Название</th>
                     <th>Код</th>
-                    <th>Вход</th>
                     <th>Статус</th>
                     <th>Участников</th>
                     <th>Создан</th>
@@ -110,33 +66,23 @@
             </thead>
             <tbody>
                 <% exams.forEach(exam => { %>
-                <tr
-                    data-exam-row
-                    data-name="<%= exam.name %>"
-                    data-code="<%= exam.code %>"
-                    data-status="<%= exam.status %>"
-                    data-auth="<%= exam.require_geekclass ? 'geekclass' : 'manual' %>"
-                >
+                <tr data-exam-row data-name="<%= exam.name %>" data-code="<%= exam.code %>" data-status="<%= exam.status %>">
                     <td><a href="/admin/exams/<%= exam.id %>"><%= exam.name %></a></td>
                     <td><code><%= exam.code %></code></td>
-                    <td class="muted"><%= exam.require_geekclass ? 'GeekClass' : 'любой' %></td>
                     <td>
                         <span class="badge badge-<%= exam.status %>">
-                            <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ?
-                            'активен' : 'завершён') %>
+                            <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ? 'активен' : 'завершён') %>
                         </span>
                     </td>
                     <td><%= exam.participantCount || 0 %></td>
                     <td class="muted"><%= new Date(exam.created_at).toLocaleString('ru-RU') %></td>
                     <td class="table-actions">
-                        <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>"
-                            >Открыть</a
-                        >
+                        <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>">Открыть</a>
                     </td>
                 </tr>
                 <% }) %>
                 <tr class="hidden" id="exam-list-empty">
-                    <td class="muted" colspan="7">По этим фильтрам экзамены не найдены.</td>
+                    <td class="muted" colspan="6">По этим фильтрам экзамены не найдены.</td>
                 </tr>
             </tbody>
         </table>

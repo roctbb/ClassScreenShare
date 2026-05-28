@@ -49,13 +49,20 @@ function verifyToken(token) {
 
 /**
  * Принимает токен, возвращает User. Делает upsert.
+ * Доступ разрешён только teacher и admin.
  */
 async function loginByToken(token) {
     const payload = verifyToken(token);
+    const role = payload.role || 'student';
+    if (role !== 'teacher' && role !== 'admin') {
+        const err = new Error('access denied: teacher or admin role required');
+        err.status = 403;
+        throw err;
+    }
     const user = await usersService.upsertGeekclassUser({
         externalId: payload.id,
         name: payload.name || null,
-        role: payload.role || 'admin',
+        role,
     });
     return user;
 }

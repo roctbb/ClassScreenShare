@@ -46,6 +46,24 @@ async function listForParticipant(participantId, { limit = 100 } = {}) {
     });
 }
 
+/**
+ * Грузит логи всех участников экзамена одним запросом и группирует по participantId.
+ * Возвращает Map<participantId, ParticipantConnection[]>.
+ */
+async function listForExam(examId) {
+    const logs = await ParticipantConnection.findAll({
+        where: { examId },
+        order: [['created_at', 'ASC']],
+    });
+    const byParticipant = new Map();
+    for (const log of logs) {
+        const pid = log.participantId;
+        if (!byParticipant.has(pid)) byParticipant.set(pid, []);
+        byParticipant.get(pid).push(log);
+    }
+    return byParticipant;
+}
+
 function valueOf(event, camel, snake) {
     if (!event) return null;
     if (typeof event.get === 'function') {
@@ -157,6 +175,7 @@ function buildConnectionSessions(events, { now = new Date() } = {}) {
     });
 
     const activeSessions = sessions.filter((session) => session.status === 'active').length;
+    const totalAbsenceMs = calcTotalAbsenceMs(sessions);
     return {
         sessions,
         summary: {
@@ -164,13 +183,52 @@ function buildConnectionSessions(events, { now = new Date() } = {}) {
             totalSessions: sessions.length,
             isOnline: activeSessions > 0,
             lastSession: sessions[0] || null,
+            totalAbsenceMs,
+            totalAbsenceLabel: durationLabel(totalAbsenceMs),
         },
     };
+}
+
+/**
+ * Считает суммарное время отсутствия (разрывы между сессиями).
+ * Сначала мержит перекрывающиеся сессии, затем суммирует промежутки между ними.
+ */
+function calcTotalAbsenceMs(sessions) {
+    // Берём только сессии с известным началом.
+    const intervals = sessions
+        .filter((s) => s.startedAt)
+        .map((s) => ({
+            start: new Date(s.startedAt).getTime(),
+            end: s.endedAt ? new Date(s.endedAt).getTime() : Date.now(),
+        }))
+        .sort((a, b) => a.start - b.start);
+
+    if (intervals.length < 2) return 0;
+
+    // Мержим перекрывающиеся интервалы.
+    const merged = [{ ...intervals[0] }];
+    for (let i = 1; i < intervals.length; i++) {
+        const last = merged[merged.length - 1];
+        if (intervals[i].start <= last.end) {
+            last.end = Math.max(last.end, intervals[i].end);
+        } else {
+            merged.push({ ...intervals[i] });
+        }
+    }
+
+    // Суммируем промежутки между смёрженными интервалами.
+    let totalMs = 0;
+    for (let i = 1; i < merged.length; i++) {
+        totalMs += merged[i].start - merged[i - 1].end;
+    }
+    return Math.max(0, totalMs);
 }
 
 module.exports = {
     recordSocketEvent,
     listForParticipant,
+    listForExam,
     buildConnectionSessions,
     durationLabel,
+    calcTotalAbsenceMs,
 };

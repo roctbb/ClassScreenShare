@@ -3,6 +3,7 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const examsService = require('../services/exams');
+const participantConnectionsService = require('../services/participantConnections');
 const config = require('../config');
 
 const router = express.Router();
@@ -31,12 +32,9 @@ router.post('/exams', async (req, res, next) => {
             return res.redirect('/admin?error=empty');
         }
         const code = String(req.body.code || '').trim();
-        const requireGeekclass =
-            req.body.requireGeekclass === '1' || req.body.requireGeekclass === 'on';
         const exam = await examsService.createExam({
             name,
             code,
-            requireGeekclass,
             createdBy: req.user.id,
         });
         req.log.info({ examId: exam.id, code: exam.code }, 'exam created');
@@ -54,7 +52,7 @@ router.post('/exams', async (req, res, next) => {
     }
 });
 
-// Карточка экзамена.
+// Карточка экзамена (объединяет список участников и live-мониторинг).
 router.get('/exams/:id(\\d+)', async (req, res, next) => {
     try {
         const id = Number(req.params.id);
@@ -62,37 +60,37 @@ router.get('/exams/:id(\\d+)', async (req, res, next) => {
         if (!exam) return next();
 
         const participants = await examsService.listParticipants(id);
+
+        // Загружаем логи подключений всех участников одним запросом.
+        const logsByParticipant = await participantConnectionsService.listForExam(id);
+        const absenceMap = {};
+        for (const p of participants) {
+            const logs = logsByParticipant.get(p.id) || [];
+            const timeline = participantConnectionsService.buildConnectionSessions(
+                logs.map((l) => l.toJSON())
+            );
+            absenceMap[p.id] = timeline.summary.totalAbsenceLabel;
+        }
+
         res.renderPage('admin/exam', {
             title: `Экзамен: ${exam.name}`,
             exam: exam.toJSON(),
-            participants: participants.map((p) => p.toJSON()),
+            participants: participants.map((p) => ({
+                ...p.toJSON(),
+                absenceLabel: absenceMap[p.id] || '—',
+            })),
             inviteUrl: `${config.publicUrl}/exam/${exam.code}`,
             renamed: req.query.renamed === '1',
+            inactivityTimeout: config.inactivityTimeout,
         });
     } catch (err) {
         next(err);
     }
 });
 
-// Live-мониторинг.
-router.get('/exams/:id(\\d+)/live', async (req, res, next) => {
-    try {
-        const id = Number(req.params.id);
-        const exam = await examsService.getExamById(id);
-        if (!exam) return next();
-        if (exam.status !== 'active') {
-            return res.redirect(`/admin/exams/${id}`);
-        }
-        const participants = await examsService.listParticipants(id);
-        res.renderPage('admin/live', {
-            title: `Live: ${exam.name}`,
-            exam: exam.toJSON(),
-            participants: participants.map((p) => p.toJSON()),
-            inactivityTimeout: config.inactivityTimeout,
-        });
-    } catch (err) {
-        next(err);
-    }
+// Постоянный редирект со старого live-URL на объединённую страницу.
+router.get('/exams/:id(\\d+)/live', (req, res) => {
+    res.redirect(301, `/admin/exams/${req.params.id}`);
 });
 
 // Экспорт участников в CSV.
@@ -221,7 +219,6 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const pathMod = require('path');
 const videoService = require('../services/video');
-const participantConnectionsService = require('../services/participantConnections');
 const { Participant, Frame, Recording } = require('../db/models');
 
 // Страница участника с плеером.
@@ -251,6 +248,7 @@ router.get('/exams/:examId(\\d+)/participants/:pid(\\d+)', async (req, res, next
             frameCount,
             connectionSessions: connectionTimeline.sessions,
             connectionSummary: connectionTimeline.summary,
+            maxGapSeconds: config.video.maxGapSeconds,
         });
     } catch (err) {
         next(err);

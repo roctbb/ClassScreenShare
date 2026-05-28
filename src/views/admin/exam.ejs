@@ -1,233 +1,224 @@
-<% const totalFrames = participants.reduce((sum, p) => sum + (Number(p.frameCount) || 0), 0); %> <%
-const recordingStatus = (p) => (p.recording && p.recording.status ? p.recording.status : ''); %> <%
-const readyVideos = participants.filter((p) => recordingStatus(p) === 'done').length; %> <% const
-convertingVideos = participants.filter((p) => ['pending', 'running'].includes(recordingStatus(p))
-).length; %> <% const failedVideos = participants.filter((p) => recordingStatus(p) ===
-'failed').length; %>
+<% const totalFrames = participants.reduce((sum, p) => sum + (Number(p.frameCount) || 0), 0); %>
+<% const recordingStatus = (p) => (p.recording && p.recording.status ? p.recording.status : ''); %>
+<% const readyVideos = participants.filter((p) => recordingStatus(p) === 'done').length; %>
+<% const convertingVideos = participants.filter((p) => ['pending', 'running'].includes(recordingStatus(p))).length; %>
+<% const failedVideos = participants.filter((p) => recordingStatus(p) === 'failed').length; %>
+<% const isActive = exam.status === 'active'; %>
+
 <div class="page">
-    <div class="page-header">
-        <a class="back-link" href="/admin">← К списку экзаменов</a>
-        <h1><%= exam.name %></h1>
-        <span class="badge badge-<%= exam.status %>">
-            <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ? 'активен' :
-            'завершён') %>
-        </span>
+
+    <!-- Компактная шапка: название + статус + действия в одну строку -->
+    <div class="exam-topbar">
+        <a class="back-link" href="/admin">←</a>
+
+        <div class="exam-title-group">
+            <h1 id="exam-title-display"><%= exam.name %></h1>
+            <span class="badge badge-<%= exam.status %>">
+                <%= exam.status === 'draft' ? 'черновик' : (exam.status === 'active' ? 'активен' : 'завершён') %>
+            </span>
+        </div>
+
+        <!-- Инлайн-форма переименования -->
+        <form id="rename-form" method="post" action="/admin/exams/<%= exam.id %>/rename"
+            class="inline-form hidden exam-rename-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <input type="text" name="name" value="<%= exam.name %>" required maxlength="255" />
+            <button type="submit" class="btn btn-sm">✓</button>
+            <button type="button" class="btn btn-sm btn-secondary"
+                onclick="document.getElementById('rename-form').classList.add('hidden');document.getElementById('exam-title-display').classList.remove('hidden')">✕</button>
+        </form>
+
+        <div class="exam-topbar-actions">
+            <!-- Основное действие по статусу -->
+            <% if (exam.status === 'draft') { %>
+            <form method="post" action="/admin/exams/<%= exam.id %>/activate">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-success btn-sm">▶ Запустить</button>
+            </form>
+            <% } else if (exam.status === 'active') { %>
+            <form method="post" action="/admin/exams/<%= exam.id %>/finish"
+                onsubmit="return confirm('Завершить экзамен?');">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-secondary btn-sm">■ Завершить</button>
+            </form>
+            <% } else { %>
+            <form method="post" action="/admin/exams/<%= exam.id %>/convert-all">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-secondary btn-sm" title="Конвертировать все записи в видео">⬇ Конвертировать все</button>
+            </form>
+            <% } %>
+
+            <!-- Иконка-кнопка: переименовать -->
+            <button class="btn btn-secondary btn-sm btn-icon" type="button" title="Переименовать"
+                onclick="document.getElementById('rename-form').classList.toggle('hidden');document.getElementById('exam-title-display').classList.toggle('hidden');document.querySelector('#rename-form input[name=name]').focus()">
+                ✎
+            </button>
+
+            <!-- Иконка-кнопка: удалить -->
+            <form method="post" action="/admin/exams/<%= exam.id %>/delete"
+                onsubmit="return confirm('Удалить экзамен и все его записи? Это необратимо.');">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button type="submit" class="btn btn-danger btn-sm btn-icon" title="Удалить экзамен">🗑</button>
+            </form>
+        </div>
     </div>
 
     <% if (renamed) { %>
     <div class="alert alert-success">Название обновлено.</div>
     <% } %>
 
-    <div class="summary-grid exam-summary" aria-label="Сводка экзамена">
-        <div class="summary-tile">
-            <span class="summary-label">Участники</span>
-            <strong id="summary-participants"><%= participants.length %></strong>
-        </div>
-        <div class="summary-tile">
-            <span class="summary-label">Кадры</span>
-            <strong id="summary-frames"><%= totalFrames %></strong>
-        </div>
-        <div class="summary-tile">
-            <span class="summary-label">Видео готово</span>
-            <strong
-                ><span id="summary-video-ready"><%= readyVideos %></span>/<%= participants.length
-                %></strong
-            >
-        </div>
-        <div class="summary-tile">
-            <span class="summary-label">Конвертация</span>
-            <strong id="summary-video-converting"><%= convertingVideos %></strong>
-            <% if (failedVideos > 0) { %>
-            <small class="summary-danger">
-                Ошибки: <span id="summary-video-failed"><%= failedVideos %></span>
-            </small>
-            <% } else { %>
-            <small class="summary-danger hidden">
-                Ошибки: <span id="summary-video-failed">0</span>
-            </small>
-            <% } %>
-        </div>
-    </div>
-
-    <div class="grid-2">
-        <div class="card">
-            <h2>Подключение участников</h2>
-            <p class="muted">
-                Раздайте ссылку участникам экзамена. Каждый сможет подключиться по этой ссылке, <%
-                if (exam.require_geekclass) { %>авторизоваться через GeekClass и начать делиться
-                экраном.<% } else { %>ввести имя или войти через GeekClass и начать делиться
-                экраном.<% } %>
-            </p>
-            <p><strong>Код:</strong> <code class="code-pill"><%= exam.code %></code></p>
-            <p>
-                <strong>Ссылка:</strong>
-                <input
-                    type="text"
-                    id="invite-link"
-                    value="<%= inviteUrl %>"
-                    readonly
-                    onclick="this.select()"
-                />
-            </p>
-            <button class="btn btn-secondary btn-sm" type="button" id="copy-invite-btn">
-                Скопировать ссылку
-            </button>
+    <!-- Инфополоса: ссылка + статистика + параметры в одну строку -->
+    <div class="exam-infobar card">
+        <div class="exam-infobar-invite">
+            <code class="code-pill"><%= exam.code %></code>
+            <input type="text" id="invite-link" value="<%= inviteUrl %>" readonly onclick="this.select()" class="invite-input" />
+            <button class="btn btn-secondary btn-sm btn-icon" type="button" id="copy-invite-btn" title="Скопировать ссылку">⎘</button>
             <span class="copy-feedback muted" id="copy-invite-feedback" aria-live="polite"></span>
         </div>
-
-        <div class="card">
-            <h2>Параметры</h2>
-            <dl class="kv">
-                <dt>Интервал кадра:</dt>
-                <dd><%= exam.captureInterval ?? exam.capture_interval %> мс</dd>
-                <dt>Качество:</dt>
-                <dd><%= exam.imageQuality ?? exam.image_quality %></dd>
-                <dt>Ширина:</dt>
-                <dd><%= exam.imageWidth ?? exam.image_width %> px</dd>
-                <dt>Вход:</dt>
-                <dd>
-                    <%= exam.require_geekclass ? 'только GeekClass' : 'имя вручную или GeekClass' %>
-                </dd>
-                <dt>Создан:</dt>
-                <dd><%= new Date(exam.created_at).toLocaleString('ru-RU') %></dd>
-                <% if (exam.started_at) { %>
-                <dt>Запущен:</dt>
-                <dd><%= new Date(exam.started_at).toLocaleString('ru-RU') %></dd>
-                <% } %> <% if (exam.finished_at) { %>
-                <dt>Завершён:</dt>
-                <dd><%= new Date(exam.finished_at).toLocaleString('ru-RU') %></dd>
-                <% } %>
-            </dl>
-        </div>
-    </div>
-
-    <div class="card actions-card">
-        <h2>Действия</h2>
-        <div class="actions-row">
-            <% if (exam.status !== 'finished') { %>
-            <a class="btn" href="/admin/exams/<%= exam.id %>/live">Live-мониторинг</a>
-            <% } %> <% if (exam.status === 'draft') { %>
-            <form method="post" action="/admin/exams/<%= exam.id %>/activate">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <button type="submit" class="btn btn-success">Запустить экзамен</button>
-            </form>
-            <% } %> <% if (exam.status === 'active') { %>
-            <form
-                method="post"
-                action="/admin/exams/<%= exam.id %>/finish"
-                onsubmit="return confirm('Завершить экзамен? После этого новые участники не смогут подключиться.');"
-            >
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <button type="submit" class="btn btn-secondary">Завершить экзамен</button>
-            </form>
-            <% } %> <% if (exam.status === 'finished') { %>
-            <form method="post" action="/admin/exams/<%= exam.id %>/convert-all">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <button type="submit" class="btn btn-secondary">Конвертировать все записи</button>
-            </form>
+        <div class="exam-infobar-stats">
+            <span title="Участников"><strong id="summary-participants"><%= participants.length %></strong> уч.</span>
+            <span title="Кадров всего"><strong id="summary-frames"><%= totalFrames %></strong> кадров</span>
+            <span title="Видео готово"><strong><span id="summary-video-ready"><%= readyVideos %></span>/<%= participants.length %></strong> видео</span>
+            <% if (convertingVideos > 0) { %>
+            <span class="badge badge-draft" id="summary-video-converting"><%= convertingVideos %> конв.</span>
+            <% } else { %>
+            <span class="hidden" id="summary-video-converting"></span>
             <% } %>
-
-            <button
-                class="btn btn-secondary"
-                type="button"
-                onclick="document.getElementById('rename-form').classList.toggle('hidden')"
-            >
-                Переименовать
-            </button>
-
-            <form
-                method="post"
-                action="/admin/exams/<%= exam.id %>/delete"
-                onsubmit="return confirm('Удалить экзамен и все его записи? Это необратимо.');"
-            >
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <button type="submit" class="btn btn-danger">Удалить</button>
-            </form>
+            <% if (failedVideos > 0) { %>
+            <span class="badge badge-finished summary-danger">Ошибки: <span id="summary-video-failed"><%= failedVideos %></span></span>
+            <% } else { %>
+            <span class="hidden summary-danger">Ошибки: <span id="summary-video-failed">0</span></span>
+            <% } %>
         </div>
-
-        <form
-            id="rename-form"
-            method="post"
-            action="/admin/exams/<%= exam.id %>/rename"
-            class="inline-form hidden rename-form"
-        >
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <input type="text" name="name" value="<%= exam.name %>" required maxlength="255" />
-            <button type="submit" class="btn btn-sm">Сохранить</button>
-        </form>
+        <details class="exam-params-details">
+            <summary class="muted">Параметры</summary>
+            <dl class="kv exam-params-kv">
+                <dt>Интервал:</dt><dd><%= exam.captureInterval ?? exam.capture_interval %> мс</dd>
+                <dt>Качество:</dt><dd><%= exam.imageQuality ?? exam.image_quality %></dd>
+                <dt>Ширина:</dt><dd><%= exam.imageWidth ?? exam.image_width %> px</dd>
+                <dt>Создан:</dt><dd><%= new Date(exam.created_at).toLocaleString('ru-RU') %></dd>
+                <% if (exam.started_at) { %><dt>Запущен:</dt><dd><%= new Date(exam.started_at).toLocaleString('ru-RU') %></dd><% } %>
+                <% if (exam.finished_at) { %><dt>Завершён:</dt><dd><%= new Date(exam.finished_at).toLocaleString('ru-RU') %></dd><% } %>
+            </dl>
+        </details>
     </div>
 
+    <% if (isActive) { %>
+    <div class="card live-inline-card">
+        <div class="live-inline-header">
+            <h2>Live</h2>
+            <span id="conn-status" class="conn-status conn-disconnected">
+                <span class="conn-dot"></span><span id="conn-text">Подключение…</span>
+            </span>
+            <div class="live-stats">
+                <span>Всего: <strong id="total-count">0</strong></span>
+                <span>Онлайн: <strong id="live-count">0</strong></span>
+                <span class="muted hidden" id="disconnected-count">Оффлайн: <strong id="disconnected-num">0</strong></span>
+                <span class="muted hidden" id="stale-count">⚠ <strong id="stale-num">0</strong></span>
+            </div>
+            <div class="live-header-right">
+                <div class="segmented live-filters" role="group" aria-label="Фильтр">
+                    <button class="active" type="button" data-live-filter="all">Все</button>
+                    <button type="button" data-live-filter="active">Онлайн</button>
+                    <button type="button" data-live-filter="problem">⚠</button>
+                </div>
+                <input id="live-search-input" type="search" placeholder="Поиск…" autocomplete="off" class="live-search-compact" />
+                <button class="btn btn-secondary btn-sm" type="button" id="mute-btn" title="Включить/выключить звук">🔔</button>
+            </div>
+        </div>
+        <p class="live-filter-summary muted hidden" id="live-filter-summary"></p>
+        <button class="btn btn-secondary btn-sm hidden" type="button" id="live-search-clear" style="display:none">✕</button>
+
+        <div class="live-body">
+            <div class="live-grid" id="grid">
+                <% if (participants.length === 0) { %>
+                <div class="live-empty muted" id="empty-state">Ожидание участников…</div>
+                <% } else { %>
+                <% participants.forEach(p => { %>
+                <div class="screen-card" data-pid="<%= p.id %>" data-name="<%= p.name %>">
+                    <div class="screen-name">
+                        <span class="screen-name-text"><%= p.name %></span>
+                        <span class="screen-since muted">—</span>
+                    </div>
+                    <div class="screen-img">
+                        <span class="screen-placeholder muted">Ожидание кадра…</span>
+                    </div>
+                    <div class="screen-status hidden"></div>
+                </div>
+                <% }) %>
+                <% } %>
+            </div>
+            <aside class="live-log">
+                <h3>Журнал</h3>
+                <ul id="log-list">
+                    <li class="log-empty" id="log-empty">Событий пока нет.</li>
+                </ul>
+            </aside>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Таблица участников -->
     <div class="card">
         <div class="card-heading">
             <h2>Участники <span class="muted">(<%= participants.length %>)</span></h2>
-            <a class="btn btn-sm btn-secondary" href="/admin/exams/<%= exam.id %>/participants.csv">
-                Экспорт CSV
-            </a>
+            <a class="btn btn-sm btn-secondary btn-icon" href="/admin/exams/<%= exam.id %>/participants.csv" title="Экспорт CSV">⬇ CSV</a>
         </div>
         <% if (participants.length === 0) { %>
         <p class="muted">Пока никто не присоединился.</p>
         <% } else { %>
         <div class="table-shell">
-            <table class="data-table">
+            <table class="data-table participants-table">
                 <thead>
                     <tr>
                         <th>Имя</th>
-                        <th>Кадров</th>
-                        <th>Подключился</th>
-                        <th>Последний кадр</th>
+                        <th title="Кадров записано">Кадры</th>
+                        <th title="Время отсутствия">Отсутствие</th>
                         <th>Запись</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <% participants.forEach(p => { %>
-                    <tr
-                        data-pid="<%= p.id %>"
-                        data-frame-count="<%= p.frameCount || 0 %>"
-                        data-recording-status="<%= recordingStatus(p) %>"
-                    >
-                        <td><%= p.name %></td>
-                        <td><%= p.frameCount || 0 %></td>
-                        <td class="muted"><%= new Date(p.joined_at).toLocaleString('ru-RU') %></td>
-                        <td class="muted">
-                            <% if (p.lastFrameTs) { %> <%= new
-                            Date(Number(p.lastFrameTs)).toLocaleString('ru-RU') %> <% } else { %>—<%
-                            } %>
+                    <tr data-pid="<%= p.id %>" data-frame-count="<%= p.frameCount || 0 %>"
+                        data-recording-status="<%= recordingStatus(p) %>">
+                        <td>
+                            <div class="participant-name-cell">
+                                <span><%= p.name %></span>
+                                <small class="muted participant-meta">
+                                    <%= new Date(p.joined_at).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) %>
+                                    <% if (p.lastFrameTs) { %>
+                                    · <%= new Date(Number(p.lastFrameTs)).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) %>
+                                    <% } %>
+                                </small>
+                            </div>
                         </td>
+                        <td><%= p.frameCount || 0 %></td>
+                        <td class="muted"><%= p.absenceLabel || '—' %></td>
                         <td class="rec-status">
-                            <% if (p.recording && p.recording.status === 'done') { %>
-                            <span class="badge badge-active">видео готово</span>
-                            <% } else if (p.recording && (p.recording.status === 'pending' ||
-                            p.recording.status === 'running')) { %>
-                            <span class="badge badge-draft">конвертируется…</span>
-                            <% } else if (p.recording && p.recording.status === 'failed') { %>
-                            <span class="badge badge-finished">ошибка</span>
+                            <% if (recordingStatus(p) === 'done') { %>
+                            <span class="badge badge-active">✓ готово</span>
+                            <% } else if (['pending', 'running'].includes(recordingStatus(p))) { %>
+                            <span class="badge badge-draft">⟳ конв.</span>
+                            <% } else if (recordingStatus(p) === 'failed') { %>
+                            <span class="badge badge-finished">✗ ошибка</span>
                             <% } else { %>
                             <span class="muted">—</span>
                             <% } %>
                         </td>
-                        <td>
+                        <td class="table-actions">
                             <span class="rec-action">
-                                <% if ((p.frameCount || 0) > 0 && (!p.recording ||
-                                p.recording.status === 'failed' || p.recording.status === 'done')) {
-                                %>
-                                <form
-                                    method="post"
-                                    action="/admin/exams/<%= exam.id %>/participants/<%= p.id %>/convert"
-                                >
+                                <% if ((p.frameCount || 0) > 0 && (!p.recording || ['failed','done'].includes(recordingStatus(p)))) { %>
+                                <form method="post" action="/admin/exams/<%= exam.id %>/participants/<%= p.id %>/convert" style="display:inline">
                                     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                                    <button type="submit" class="btn btn-sm btn-secondary">
-                                        <%= p.recording && p.recording.status === 'done' ?
-                                        'Переконв.' : 'В видео' %>
-                                    </button>
+                                    <button type="submit" class="btn btn-sm btn-secondary btn-icon"
+                                        title="<%= recordingStatus(p) === 'done' ? 'Переконвертировать' : 'Конвертировать в видео' %>">⬇</button>
                                 </form>
                                 <% } %>
                             </span>
-                            <a
-                                class="btn btn-sm btn-secondary"
+                            <a class="btn btn-sm btn-secondary btn-icon"
                                 href="/admin/exams/<%= exam.id %>/participants/<%= p.id %>"
-                                >Открыть</a
-                            >
+                                title="Открыть запись участника">→</a>
                         </td>
                     </tr>
                     <% }) %>
@@ -237,11 +228,23 @@ convertingVideos = participants.filter((p) => ['pending', 'running'].includes(re
         <% } %>
     </div>
 </div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
     window.__EXAM_PAGE__ = {
         examId: <%= exam.id %>,
-        csrf: <%- JSON.stringify(csrfToken) %>
+        csrf: <%- JSON.stringify(csrfToken) %>,
+        isActive: <%= isActive %>,
     };
+    <% if (isActive) { %>
+    window.__LIVE__ = <%- JSON.stringify({
+        examId: exam.id,
+        inactivityTimeout,
+        captureInterval: exam.captureInterval ?? exam.capture_interval ?? 3000,
+    }) %>;
+    <% } %>
 </script>
 <script src="/js/admin-exam.js?v=<%= assetVersion %>"></script>
+<% if (isActive) { %>
+<script src="/js/live.js?v=<%= assetVersion %>"></script>
+<% } %>

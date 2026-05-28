@@ -1,7 +1,6 @@
 'use strict';
 
 const express = require('express');
-const { z } = require('zod');
 const config = require('../config');
 const examsService = require('../services/exams');
 const geekclassService = require('../services/geekclass');
@@ -10,27 +9,15 @@ const { normalizeExamCode } = require('../lib/util');
 
 const router = express.Router();
 
-const PARTICIPANT_COOKIE = 'cs.participant';
+// Cookie больше не используется для auth участника — только для хранения examCode после GeekClass.
+const EXAM_COOKIE = 'cs.exam';
 
-const joinSchema = z.object({
-    name: z
-        .string()
-        .trim()
-        .min(1, 'name is required')
-        .max(120, 'name is too long')
-        // Запрещаем управляющие символы — это намеренный фильтр.
-        // eslint-disable-next-line no-control-regex
-        .regex(/^[^\u0000-\u001F\u007F]+$/, 'name contains invalid characters'),
-});
-
-function setParticipantCookie(res, token) {
-    res.cookie(PARTICIPANT_COOKIE, token, {
+function setExamCookie(res, code) {
+    res.cookie(EXAM_COOKIE, code, {
         httpOnly: true,
         sameSite: 'lax',
-        // session-scoped (закрытие браузера = удаление). При перезагрузке вкладки
-        // сохраняется, а это всё что нам нужно для reconnect.
-        secure: false, // ставится сервером в любом случае только под httpOnly
         path: '/',
+        maxAge: 60 * 60 * 1000, // 1 час
     });
 }
 
@@ -40,27 +27,6 @@ function requestIp(req) {
         req.socket.remoteAddress ||
         null
     );
-}
-
-function participantNameFromGeekclass(payload) {
-    const candidates = [
-        payload.name,
-        payload.full_name,
-        payload.fullName,
-        payload.username,
-        payload.login,
-        payload.email,
-        typeof payload.id !== 'undefined' ? `GeekClass ${payload.id}` : null,
-    ];
-    for (const value of candidates) {
-        const name = String(value || '').trim();
-        if (!name) continue;
-        const parsed = joinSchema.safeParse({ name: name.slice(0, 120) });
-        if (parsed.success) return parsed.data.name;
-    }
-    const err = new Error('geekclass profile has no valid name');
-    err.status = 400;
-    throw err;
 }
 
 function codeFromInput(input) {
@@ -74,8 +40,6 @@ function codeFromInput(input) {
     }
 }
 
-// Промежуточный лог-helper, чтобы admin/exam ссылка отрабатывалась только
-// для активных экзаменов.
 async function loadActiveExam(req, res, next) {
     const code = String(req.params.code || '').toUpperCase();
     const exam = await examsService.getExamByCode(code);
@@ -98,6 +62,7 @@ async function loadActiveExam(req, res, next) {
     next();
 }
 
+// Редирект /exam?code=XXX → /exam/XXX
 router.get('/exam', (req, res) => {
     try {
         const code = codeFromInput(req.query.code);
@@ -108,23 +73,47 @@ router.get('/exam', (req, res) => {
     }
 });
 
-router.get('/exam/:code/geekclass', loadActiveExam, (req, res) => {
-    if (!config.geekclass.enabled) {
-        return res.status(404).renderPage('error', {
-            title: 'GeekClass недоступен',
-            message: 'Вход через GeekClass не настроен.',
-        });
+// Страница участника: если уже авторизован — показываем сразу, иначе → GeekClass.
+router.get('/exam/:code', loadActiveExam, async (req, res, next) => {
+    try {
+        const pid = Number(req.cookies['cs.participant.pid']);
+        if (pid) {
+            const participant = await participantsService.findByGeekclassId(
+                req.exam.id,
+                req.cookies['cs.participant.gc']
+            );
+            if (participant) {
+                return res.renderPage('exam/index', {
+                    title: req.exam.name,
+                    exam: req.exam.toJSON(),
+                    participant: participant.toJSON(),
+                    captureInterval: req.exam.captureInterval,
+                    imageQuality: req.exam.imageQuality,
+                    imageWidth: req.exam.imageWidth,
+                });
+            }
+        }
+        if (!config.geekclass.enabled) {
+            return res.status(503).renderPage('error', {
+                title: 'GeekClass недоступен',
+                message: 'Для участия в экзамене необходима авторизация через GeekClass.',
+            });
+        }
+        setExamCookie(res, req.exam.code);
+        const callback = `${config.publicUrl}/exam/${req.exam.code}/geekclass/callback`;
+        return res.redirect(geekclassService.buildLoginUrl(callback));
+    } catch (err) {
+        next(err);
     }
-    const callback = `${config.publicUrl}/exam/${req.exam.code}/geekclass/callback`;
-    return res.redirect(geekclassService.buildLoginUrl(callback));
 });
 
+// GeekClass callback для участника.
 router.get('/exam/:code/geekclass/callback', loadActiveExam, async (req, res, next) => {
     try {
         if (!config.geekclass.enabled) {
-            return res.status(404).renderPage('error', {
+            return res.status(503).renderPage('error', {
                 title: 'GeekClass недоступен',
-                message: 'Вход через GeekClass не настроен.',
+                message: 'Авторизация через GeekClass не настроена.',
             });
         }
         const token = req.query.token;
@@ -144,113 +133,46 @@ router.get('/exam/:code/geekclass/callback', loadActiveExam, async (req, res, ne
                 message: 'Токен GeekClass невалиден или устарел.',
             });
         }
-        const name = participantNameFromGeekclass(payload);
-        const existingToken = req.cookies[PARTICIPANT_COOKIE] || null;
+
+        // Имя участника из JWT.
+        const name = extractName(payload);
+
         const { participant } = await participantsService.joinOrResume({
             examId: req.exam.id,
             name,
-            token: existingToken,
+            geekclassId: String(payload.id),
             ip: requestIp(req),
             userAgent: req.headers['user-agent'],
         });
-        setParticipantCookie(res, participant.token);
-        return res.redirect(`/exam/${encodeURIComponent(req.exam.code)}`);
+
+        // Сохраняем geekclass_id в сессии участника (в cookie) для handshake publisher.
+        res.cookie('cs.participant.gc', String(payload.id), {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 24 * 60 * 60 * 1000,
+        });
+        res.cookie('cs.participant.pid', String(participant.id), {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 24 * 60 * 60 * 1000,
+        });
+
+        return res.renderPage('exam/index', {
+            title: req.exam.name,
+            exam: req.exam.toJSON(),
+            participant: participant.toJSON(),
+            captureInterval: req.exam.captureInterval,
+            imageQuality: req.exam.imageQuality,
+            imageWidth: req.exam.imageWidth,
+        });
     } catch (err) {
         if (err.status === 400) {
             return res.status(400).renderPage('error', {
-                title: 'Ошибка авторизации',
+                title: 'Ошибка',
                 message: err.message,
             });
-        }
-        next(err);
-    }
-});
-
-// Страница участника: форма имени, после сабмита — захват экрана.
-router.get('/exam/:code', loadActiveExam, async (req, res, next) => {
-    try {
-        const exam = req.exam;
-        const token = req.cookies[PARTICIPANT_COOKIE] || null;
-        let participant = null;
-        if (token) {
-            participant = await participantsService.findByToken(exam.id, token);
-        }
-        const requireGeekclass = Boolean(exam.requireGeekclass);
-        if (!participant && requireGeekclass) {
-            if (!config.geekclass.enabled) {
-                return res.status(503).renderPage('error', {
-                    title: 'GeekClass недоступен',
-                    message:
-                        'Для этого экзамена обязателен вход через GeekClass, но он не настроен.',
-                });
-            }
-            return res.redirect(`/exam/${encodeURIComponent(exam.code)}/geekclass`);
-        }
-
-        res.renderPage('exam/index', {
-            title: exam.name,
-            exam: exam.toJSON(),
-            participant: participant ? participant.toJSON() : null,
-            captureInterval: exam.captureInterval,
-            imageQuality: exam.imageQuality,
-            imageWidth: exam.imageWidth,
-            geekclassEnabled: config.geekclass.enabled,
-            requireGeekclass,
-        });
-    } catch (err) {
-        next(err);
-    }
-});
-
-// API: участник вводит имя (или возвращается в свою сессию), мы создаём/обновляем
-// participant и ставим cookie. Отвечает JSON, чтобы фронт мог обработать ошибки.
-router.post('/api/exam/:code/join', loadActiveExam, async (req, res, next) => {
-    try {
-        const exam = req.exam;
-        if (exam.requireGeekclass) {
-            return res.status(403).json({
-                ok: false,
-                error: 'geekclass_required',
-            });
-        }
-        const parsed = joinSchema.safeParse(req.body || {});
-        if (!parsed.success) {
-            return res.status(400).json({
-                ok: false,
-                error: parsed.error.issues[0]?.message || 'invalid input',
-            });
-        }
-        const name = parsed.data.name;
-        const existingToken = req.cookies[PARTICIPANT_COOKIE] || null;
-
-        const { participant, resumed } = await participantsService.joinOrResume({
-            examId: exam.id,
-            name,
-            token: existingToken,
-            ip: requestIp(req),
-            userAgent: req.headers['user-agent'],
-        });
-
-        setParticipantCookie(res, participant.token);
-
-        res.json({
-            ok: true,
-            resumed,
-            participant: {
-                id: participant.id,
-                name: participant.name,
-            },
-            exam: {
-                code: exam.code,
-                name: exam.name,
-                captureInterval: exam.captureInterval,
-                imageQuality: exam.imageQuality,
-                imageWidth: exam.imageWidth,
-            },
-        });
-    } catch (err) {
-        if (err.status === 400) {
-            return res.status(400).json({ ok: false, error: err.message });
         }
         next(err);
     }
@@ -259,21 +181,41 @@ router.post('/api/exam/:code/join', loadActiveExam, async (req, res, next) => {
 // API: участник нажал "Завершить".
 router.post('/api/exam/:code/leave', loadActiveExam, async (req, res, next) => {
     try {
-        const exam = req.exam;
-        const token = req.cookies[PARTICIPANT_COOKIE];
-        if (!token) {
-            return res.status(400).json({ ok: false, error: 'no_token' });
-        }
-        const participant = await participantsService.findByToken(exam.id, token);
-        if (!participant) {
-            return res.status(404).json({ ok: false, error: 'not_found' });
+        const pid = Number(req.cookies['cs.participant.pid']);
+        const gc = req.cookies['cs.participant.gc'];
+        if (!pid || !gc) return res.status(400).json({ ok: false, error: 'no_session' });
+
+        const participant = await participantsService.findByGeekclassId(req.exam.id, gc);
+        if (!participant) return res.status(404).json({ ok: false, error: 'not_found' });
+
+        // Проверка целостности cookie: pid должен соответствовать participant найденному по gc.
+        if (participant.id !== pid) {
+            return res.status(403).json({ ok: false, error: 'cookie_mismatch' });
         }
         await participantsService.leave(participant.id);
-        res.clearCookie(PARTICIPANT_COOKIE);
+        res.clearCookie('cs.participant.gc');
+        res.clearCookie('cs.participant.pid');
         res.json({ ok: true });
     } catch (err) {
         next(err);
     }
 });
 
-module.exports = { router, PARTICIPANT_COOKIE };
+function extractName(payload) {
+    const candidates = [
+        payload.name,
+        payload.full_name,
+        payload.fullName,
+        payload.username,
+        payload.login,
+        payload.email,
+        typeof payload.id !== 'undefined' ? `GeekClass ${payload.id}` : null,
+    ];
+    for (const value of candidates) {
+        const name = String(value || '').trim().slice(0, 120);
+        if (name) return name;
+    }
+    return `GeekClass ${payload.id}`;
+}
+
+module.exports = { router, EXAM_COOKIE };
