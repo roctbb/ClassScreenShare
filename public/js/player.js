@@ -49,6 +49,17 @@
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
     }
 
+    function fmtClockAtElapsed(ms) {
+        const origin = timeline ? timeline.originTs : cfg.examStartedAt;
+        const date = new Date((origin || 0) + Math.max(0, Number(ms) || 0));
+        if (Number.isNaN(date.getTime())) return '—';
+        return date.toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    }
+
     function escapeHtml(value) {
         return String(value).replace(
             /[&<>"']/g,
@@ -109,7 +120,7 @@
             parts.push(
                 `<line class="tl-connection-marker" x1="${x}" y1="3" x2="${x}" y2="${H - 3}"` +
                     ` stroke="${stroke}" stroke-width="3" data-label="${label}"` +
-                    ` data-time="${fmtTime(marker.atMs)}" />`
+                    ` data-time="${fmtClockAtElapsed(marker.atMs)}" />`
             );
         }
         parts.push(
@@ -130,7 +141,7 @@
             const target = e.target;
             if (target && target.classList && target.classList.contains('tl-gap')) {
                 const real = target.getAttribute('data-real');
-                tlTooltip.innerHTML = `<strong>Нет связи ${real} сек</strong><br><small>${fmtTime(displayMs)}</small>`;
+                tlTooltip.innerHTML = `<strong>Нет связи ${real} сек</strong><br><small>${fmtClockAtElapsed(displayMs)}</small>`;
             } else if (
                 target &&
                 target.classList &&
@@ -138,7 +149,7 @@
             ) {
                 tlTooltip.innerHTML = `<strong>${escapeHtml(target.getAttribute('data-label'))}</strong><br><small>${escapeHtml(target.getAttribute('data-time'))}</small>`;
             } else {
-                tlTooltip.textContent = fmtTime(displayMs);
+                tlTooltip.textContent = fmtClockAtElapsed(displayMs);
             }
             tlTooltip.classList.remove('hidden');
             const wrapRect = tlWrap.getBoundingClientRect();

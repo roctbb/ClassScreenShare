@@ -618,33 +618,105 @@ label {
 }
 
 .participant-page {
-    max-width: min(1320px, calc(100vw - 32px));
+    max-width: calc(100vw - 24px);
 }
 
-.participant-page-header {
-    display: block;
-    margin-bottom: 18px;
+.participant-top-strip {
+    position: relative;
+    display: grid;
+    grid-template-columns: 34px minmax(210px, 0.7fr) minmax(460px, 1.5fr) auto;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
 }
 
-.participant-page-header .back-link {
-    display: inline-flex;
-    margin-bottom: 10px;
+.participant-back-link {
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
 }
 
 .participant-title h1 {
-    margin-bottom: 2px;
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.15;
 }
 
-.participant-summary {
-    margin-bottom: 10px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.participant-title .page-subtitle {
+    margin-top: 2px;
+    font-size: 13px;
 }
 
-.participant-jump-row {
+.participant-compact-metrics {
     display: flex;
-    flex-wrap: wrap;
+    align-items: stretch;
     gap: 8px;
-    margin: 2px 0 16px;
+    min-width: 0;
+}
+
+.participant-metric {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.participant-metric span,
+.participant-metric small {
+    color: var(--muted);
+}
+
+.participant-metric strong {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.participant-connection-details {
+    position: relative;
+    min-width: 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+}
+
+.participant-connection-details .connection-log-summary {
+    min-height: 32px;
+    padding: 6px 9px;
+}
+
+.participant-connection-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 20;
+    width: min(860px, calc(100vw - 32px));
+    max-height: min(520px, calc(100vh - 180px));
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+}
+
+.participant-top-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .copy-feedback {
@@ -663,6 +735,15 @@ label {
     .summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .participant-top-strip {
+        grid-template-columns: 34px 1fr auto;
+    }
+
+    .participant-compact-metrics {
+        grid-column: 1 / -1;
+        flex-wrap: wrap;
+    }
 }
 
 @media (max-width: 560px) {
@@ -673,6 +754,15 @@ label {
     .copy-feedback {
         display: flex;
         margin: 8px 0 0;
+    }
+
+    .participant-top-strip {
+        grid-template-columns: 34px 1fr;
+    }
+
+    .participant-top-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
     }
 }
 
@@ -1286,7 +1376,7 @@ label {
 }
 
 .participant-page .player-card {
-    width: min(1800px, calc(100vw - 32px));
+    width: calc(100vw - 24px);
     margin-left: 50%;
     transform: translateX(-50%);
 }
@@ -1306,7 +1396,7 @@ label {
 }
 
 .participant-page .player-wrap {
-    min-height: min(72vh, 760px);
+    min-height: calc(100vh - 230px);
 }
 
 .player-wrap video,
@@ -1319,7 +1409,7 @@ label {
 
 .participant-page .player-wrap video,
 .participant-page .player-wrap img {
-    max-height: 76vh;
+    max-height: calc(100vh - 230px);
 }
 
 @media (max-width: 760px) {
@@ -1763,6 +1853,18 @@ label {
 
 .connection-log-details .table-shell {
     margin-top: 8px;
+}
+
+.participant-connection-details {
+    padding: 0;
+}
+
+.participant-connection-details[open] .connection-log-summary {
+    margin-bottom: 0;
+}
+
+.participant-connection-details .table-shell {
+    margin-top: 0;
 }
 
 .user-role {
