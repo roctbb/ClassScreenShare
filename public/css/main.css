@@ -618,7 +618,7 @@ label {
 }
 
 .participant-page {
-    max-width: 1280px;
+    max-width: min(1320px, calc(100vw - 32px));
 }
 
 .participant-page-header {
@@ -1285,6 +1285,12 @@ label {
     overflow: hidden;
 }
 
+.participant-page .player-card {
+    width: min(1800px, calc(100vw - 32px));
+    margin-left: 50%;
+    transform: translateX(-50%);
+}
+
 .player-note {
     margin: 0;
     padding: 14px 16px;
@@ -1299,12 +1305,35 @@ label {
     min-height: 320px;
 }
 
+.participant-page .player-wrap {
+    min-height: min(72vh, 760px);
+}
+
 .player-wrap video,
 .player-wrap img {
     width: 100%;
     max-height: 70vh;
     display: block;
     object-fit: contain;
+}
+
+.participant-page .player-wrap video,
+.participant-page .player-wrap img {
+    max-height: 76vh;
+}
+
+@media (max-width: 760px) {
+    .participant-page,
+    .participant-page .player-card {
+        width: auto;
+        max-width: 100%;
+        margin-left: 0;
+        transform: none;
+    }
+
+    .participant-page .player-wrap {
+        min-height: 260px;
+    }
 }
 
 .player-controls {
