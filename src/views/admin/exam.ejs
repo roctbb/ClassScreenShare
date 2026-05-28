@@ -41,11 +41,11 @@
             <h2>Параметры</h2>
             <dl class="kv">
                 <dt>Интервал кадра:</dt>
-                <dd><%= exam.capture_interval %> мс</dd>
+                <dd><%= exam.captureInterval ?? exam.capture_interval %> мс</dd>
                 <dt>Качество:</dt>
-                <dd><%= exam.image_quality %></dd>
+                <dd><%= exam.imageQuality ?? exam.image_quality %></dd>
                 <dt>Ширина:</dt>
-                <dd><%= exam.image_width %> px</dd>
+                <dd><%= exam.imageWidth ?? exam.image_width %> px</dd>
                 <dt>Вход:</dt>
                 <dd>
                     <%= exam.require_geekclass ? 'только GeekClass' : 'имя вручную или GeekClass' %>

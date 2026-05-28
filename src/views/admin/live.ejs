@@ -45,7 +45,7 @@
     window.__LIVE__ = {
         examId: <%= exam.id %>,
         inactivityTimeout: <%= inactivityTimeout %>,
-        captureInterval: <%= exam.capture_interval %>
+        captureInterval: <%= exam.captureInterval ?? exam.capture_interval %>
     };
 </script>
 <script src="/js/live.js?v=<%= assetVersion %>"></script>
