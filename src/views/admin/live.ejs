@@ -6,12 +6,16 @@
             <span class="conn-dot"></span><span id="conn-text">Подключение…</span>
         </span>
         <div class="live-stats">
+            <span>Всего: <strong id="total-count">0</strong></span>
             <span>Активных: <strong id="live-count">0</strong></span>
+            <span class="muted hidden" id="disconnected-count"
+                >Отключены: <strong id="disconnected-num">0</strong></span
+            >
             <span class="muted hidden" id="stale-count"
-                >Молчат: <strong id="stale-num">0</strong></span
+                >Проблемы: <strong id="stale-num">0</strong></span
             >
         </div>
-        <button class="btn btn-secondary btn-sm" type="button" id="mute-btn">Звук включен</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="mute-btn">Включить звук</button>
     </header>
 
     <div class="live-body">
@@ -23,12 +27,13 @@
             <% } else { %> <% participants.forEach(p => { %>
             <div class="screen-card" data-pid="<%= p.id %>" data-name="<%= p.name %>">
                 <div class="screen-name">
-                    <span><%= p.name %></span>
+                    <span class="screen-name-text"><%= p.name %></span>
                     <span class="screen-since muted" data-since-for="<%= p.id %>">—</span>
                 </div>
                 <div class="screen-img">
                     <span class="screen-placeholder muted">Ожидание кадра…</span>
                 </div>
+                <div class="screen-status hidden"></div>
             </div>
             <% }) %> <% } %>
         </div>

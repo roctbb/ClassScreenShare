@@ -831,7 +831,8 @@ label {
 
 .live-stats {
     display: flex;
-    gap: 16px;
+    gap: 10px 16px;
+    flex-wrap: wrap;
     font-size: 14px;
 }
 
@@ -885,6 +886,25 @@ label {
 .screen-card.stale {
     border-color: var(--danger);
     animation: pulse-red 1.5s infinite;
+}
+
+.screen-card.disconnected .screen-img img,
+.screen-card.stale .screen-img img {
+    filter: saturate(0.55) brightness(0.7);
+}
+
+.screen-status {
+    position: absolute;
+    inset: auto 10px 10px 10px;
+    z-index: 3;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(127, 29, 29, 0.88);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    pointer-events: none;
 }
 
 @keyframes pulse-red {

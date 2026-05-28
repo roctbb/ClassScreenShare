@@ -6,7 +6,10 @@
     const $ = (id) => document.getElementById(id);
     const grid = $('grid');
     const logList = $('log-list');
+    const totalCount = $('total-count');
     const liveCount = $('live-count');
+    const disconnectedNum = $('disconnected-num');
+    const disconnectedCount = $('disconnected-count');
     const staleNum = $('stale-num');
     const staleCount = $('stale-count');
     const connStatus = $('conn-status');
@@ -19,6 +22,7 @@
     const stale = new Set(); // pids считаются stale прямо сейчас
 
     let muted = false;
+    let audioArmed = false;
     let audioCtx = null;
     let beepTimer = null;
     let fullscreenPid = null;
@@ -33,14 +37,35 @@
             audioCtx = null;
         }
     }
+    function updateAudioButton() {
+        if (muted) {
+            muteBtn.textContent = 'Звук выключен';
+            muteBtn.classList.remove('btn-success');
+            return;
+        }
+        muteBtn.textContent = audioArmed ? 'Звук готов' : 'Включить звук';
+        muteBtn.classList.toggle('btn-success', audioArmed);
+    }
+    function armAudio() {
+        ensureAudio();
+        if (!audioCtx) {
+            updateAudioButton();
+            return Promise.resolve(false);
+        }
+        const ready =
+            audioCtx.state === 'suspended'
+                ? audioCtx.resume().catch(() => null)
+                : Promise.resolve();
+        return ready.then(() => {
+            audioArmed = audioCtx && audioCtx.state === 'running';
+            updateAudioButton();
+            return audioArmed;
+        });
+    }
     function beep(freq) {
         if (muted) return;
-        ensureAudio();
-        if (!audioCtx) return;
-        const ready =
-            audioCtx.state === 'suspended' ? audioCtx.resume().catch(() => {}) : Promise.resolve();
-        ready.then(() => {
-            if (muted || !audioCtx) return;
+        armAudio().then((readyToPlay) => {
+            if (muted || !audioCtx || !readyToPlay) return;
             const o = audioCtx.createOscillator();
             const g = audioCtx.createGain();
             o.type = 'sine';
@@ -77,17 +102,24 @@
     }
 
     muteBtn.addEventListener('click', () => {
-        ensureAudio();
+        if (!audioArmed) {
+            muted = false;
+            armAudio().then(() => {
+                if (stale.size > 0) startBeeping();
+            });
+            return;
+        }
         muted = !muted;
-        muteBtn.textContent = muted ? 'Звук выключен' : 'Звук включен';
+        updateAudioButton();
         if (muted) stopBeeping();
         else if (stale.size > 0) startBeeping();
     });
 
     // Клик где угодно в гриде — инициализирует AudioContext (требование браузеров).
-    grid.addEventListener('click', ensureAudio, { once: true });
-    document.addEventListener('pointerdown', ensureAudio, { once: true, capture: true });
-    document.addEventListener('keydown', ensureAudio, { once: true, capture: true });
+    grid.addEventListener('click', armAudio, { once: true });
+    document.addEventListener('pointerdown', armAudio, { once: true, capture: true });
+    document.addEventListener('keydown', armAudio, { once: true, capture: true });
+    updateAudioButton();
 
     // ---------- Log ----------
     function logEvent(html, klass) {
@@ -111,12 +143,25 @@
         card.innerHTML = `
             <div class="screen-name"><span class="screen-name-text"></span><span class="screen-since muted">—</span></div>
             <div class="screen-img"><span class="screen-placeholder muted">Ожидание кадра…</span></div>
+            <div class="screen-status hidden"></div>
         `;
         card.querySelector('.screen-name-text').textContent = name;
         card.addEventListener('click', () => toggleFullscreen(pid));
         grid.appendChild(card);
         cards.set(pid, card);
         return card;
+    }
+    function ensureCardChrome(card) {
+        let nameText = card.querySelector('.screen-name-text');
+        if (!nameText) {
+            nameText = card.querySelector('.screen-name span:first-child');
+            if (nameText) nameText.classList.add('screen-name-text');
+        }
+        if (!card.querySelector('.screen-status')) {
+            const status = document.createElement('div');
+            status.className = 'screen-status hidden';
+            card.appendChild(status);
+        }
     }
     function removeCard(pid) {
         pid = Number(pid);
@@ -144,20 +189,28 @@
         pid = Number(pid);
         const card = cards.get(pid);
         if (!card) return;
+        const status = card.querySelector('.screen-status');
         if (isConnected) {
             connected.add(pid);
-            card.classList.remove('stale');
+            card.classList.remove('stale', 'disconnected');
             stale.delete(pid);
+            if (status) {
+                status.textContent = '';
+                status.classList.add('hidden');
+            }
             setCardSince(pid, lastTs.get(pid));
         } else {
             connected.delete(pid);
-            card.classList.add('stale');
+            card.classList.add('stale', 'disconnected');
             stale.add(pid);
             const since = card.querySelector('.screen-since');
             if (since) since.textContent = 'отключился';
+            if (status) {
+                status.textContent = 'Участник отключился';
+                status.classList.remove('hidden');
+            }
         }
-        staleNum.textContent = String(stale.size);
-        staleCount.classList.toggle('hidden', stale.size === 0);
+        refreshProblemCounts();
         refreshBeeping();
         refreshCount();
     }
@@ -195,12 +248,21 @@
         if (isStale) {
             card.classList.add('stale');
             stale.add(pid);
+            const status = card.querySelector('.screen-status');
+            if (status && !card.classList.contains('disconnected')) {
+                status.textContent = 'Нет новых кадров';
+                status.classList.remove('hidden');
+            }
         } else {
             card.classList.remove('stale');
             stale.delete(pid);
+            const status = card.querySelector('.screen-status');
+            if (status && !card.classList.contains('disconnected')) {
+                status.textContent = '';
+                status.classList.add('hidden');
+            }
         }
-        staleNum.textContent = String(stale.size);
-        staleCount.classList.toggle('hidden', stale.size === 0);
+        refreshProblemCounts();
         refreshBeeping();
     }
 
@@ -221,7 +283,15 @@
     }
 
     function refreshCount() {
+        const disconnected = Math.max(0, cards.size - connected.size);
+        totalCount.textContent = String(cards.size);
         liveCount.textContent = String(connected.size);
+        disconnectedNum.textContent = String(disconnected);
+        disconnectedCount.classList.toggle('hidden', disconnected === 0);
+    }
+    function refreshProblemCounts() {
+        staleNum.textContent = String(stale.size);
+        staleCount.classList.toggle('hidden', stale.size === 0);
     }
 
     function hydrateInitialCards() {
@@ -233,6 +303,7 @@
                 card.querySelector('.screen-name span:first-child')?.textContent ||
                 '';
             card.dataset.name = name;
+            ensureCardChrome(card);
             card.addEventListener('click', () => toggleFullscreen(pid));
             cards.set(pid, card);
             connected.add(pid);
