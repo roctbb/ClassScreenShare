@@ -50,6 +50,9 @@ describe('buildTimeline', () => {
         // Сначала показываем последний доставленный кадр один tick, затем чёрный gap.
         expect(r.gaps[0].startMs).toBe(2500);
         expect(r.gaps[0].endMs).toBe(2000 + 3000); // конец gap'а в видео
+        expect(r.gaps[0].realStartMs).toBe(2500);
+        expect(r.gaps[0].realEndMs).toBe(12000);
+        expect(r.realTotalDurationMs).toBe(13500);
     });
 
     it('records multiple gaps in correct order with cumulative offsets', () => {
@@ -65,6 +68,8 @@ describe('buildTimeline', () => {
         // Первый gap начинается после короткого показа последнего доставленного кадра.
         expect(r.gaps[0].startMs).toBe(1500);
         expect(r.gaps[0].endMs).toBe(6000);
+        expect(r.gaps[0].realStartMs).toBe(1500);
+        expect(r.gaps[0].realEndMs).toBe(100000);
         // После gap'а кадр idx=2 (101000) начинается в video t=6000, длится 1000.
         expect(r.frames[2].videoOffsetMs).toBe(6000);
         expect(r.frames[2].durationMs).toBe(1000);

@@ -42,6 +42,7 @@ function buildTimeline(frames, options = {}) {
     const result = [];
     const gaps = [];
     let videoOffsetMs = 0;
+    const firstFrameTs = frames.length ? Number(frames[0].ts) : 0;
 
     for (let i = 0; i < frames.length; i++) {
         const cur = frames[i];
@@ -56,9 +57,14 @@ function buildTimeline(frames, options = {}) {
             // обычный frame tick, а оставшуюся сжатую паузу помечаем как gap.
             if (isConnectionGap) {
                 const gapStartMs = videoOffsetMs + Math.min(defaultDurationMs, durationMs);
+                const realStartMs =
+                    Number(cur.ts) - firstFrameTs + Math.min(defaultDurationMs, durationMs);
+                const realEndMs = Number(next.ts) - firstFrameTs;
                 gaps.push({
                     startMs: gapStartMs,
                     endMs: videoOffsetMs + durationMs,
+                    realStartMs,
+                    realEndMs,
                     realDurationMs: realGap,
                 });
             }
@@ -81,6 +87,9 @@ function buildTimeline(frames, options = {}) {
     return {
         frames: result,
         totalDurationMs: videoOffsetMs,
+        realTotalDurationMs: result.length
+            ? result[result.length - 1].ts - firstFrameTs + result[result.length - 1].durationMs
+            : 0,
         gaps,
     };
 }
@@ -253,6 +262,7 @@ async function convertParticipant(participantId) {
                     participant.exam?.captureInterval ?? participant.exam?.capture_interval ?? null,
                 maxMissedFrames: 3,
                 totalDurationMs: timeline.totalDurationMs,
+                realTotalDurationMs: timeline.realTotalDurationMs,
                 frameCount: timeline.frames.length,
                 firstFrameTs: timeline.frames[0].ts,
                 lastFrameTs: timeline.frames[timeline.frames.length - 1].ts,

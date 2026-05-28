@@ -70,19 +70,21 @@
     // ------------------- Timeline SVG -------------------
     function renderTimeline() {
         if (!timeline || !timeline.totalDurationMs) return;
-        const total = timeline.totalDurationMs;
+        const total = timeline.realTotalDurationMs || timeline.totalDurationMs;
         const W = 1000;
         const H = 40;
         const parts = [
             `<rect x="0" y="8" width="${W}" height="${H - 16}" rx="4" fill="#10b981" />`,
         ];
         for (const gap of timeline.gaps || []) {
-            const x = (gap.startMs / total) * W;
-            const w = Math.max(2, ((gap.endMs - gap.startMs) / total) * W);
+            const startMs = gap.realStartMs ?? gap.startMs;
+            const endMs = gap.realEndMs ?? gap.endMs;
+            const x = (startMs / total) * W;
+            const w = Math.max(2, ((endMs - startMs) / total) * W);
             const real = Math.round(gap.realDurationMs / 1000);
             parts.push(
                 `<rect class="tl-gap" x="${x}" y="8" width="${w}" height="${H - 16}" fill="#ef4444"` +
-                    ` data-real="${real}" data-startms="${gap.startMs}" data-endms="${gap.endMs}" />`
+                    ` data-real="${real}" data-startms="${startMs}" data-endms="${endMs}" />`
             );
         }
         parts.push(
@@ -93,18 +95,19 @@
         tlSvg.addEventListener('click', (e) => {
             const rect = tlSvg.getBoundingClientRect();
             const ratio = (e.clientX - rect.left) / rect.width;
-            seekTo(Math.max(0, Math.min(total, ratio * total)));
+            const displayMs = Math.max(0, Math.min(total, ratio * total));
+            seekTo(displayToVideoMs(displayMs));
         });
         tlSvg.addEventListener('mousemove', (e) => {
             const rect = tlSvg.getBoundingClientRect();
             const ratio = (e.clientX - rect.left) / rect.width;
-            const ms = Math.max(0, Math.min(total, ratio * total));
+            const displayMs = Math.max(0, Math.min(total, ratio * total));
             const target = e.target;
             if (target && target.classList && target.classList.contains('tl-gap')) {
                 const real = target.getAttribute('data-real');
-                tlTooltip.innerHTML = `<strong>Нет связи ${real} сек</strong><br><small>${fmtTime(ms)}</small>`;
+                tlTooltip.innerHTML = `<strong>Нет связи ${real} сек</strong><br><small>${fmtTime(displayMs)}</small>`;
             } else {
-                tlTooltip.textContent = fmtTime(ms);
+                tlTooltip.textContent = fmtTime(displayMs);
             }
             tlTooltip.classList.remove('hidden');
             const wrapRect = tlWrap.getBoundingClientRect();
@@ -116,10 +119,12 @@
     function setCursor(ms) {
         const cursor = document.getElementById('tl-cursor');
         if (!cursor || !timeline || !timeline.totalDurationMs) return;
-        const x = (ms / timeline.totalDurationMs) * 1000;
+        const total = timeline.realTotalDurationMs || timeline.totalDurationMs;
+        const displayMs = recordingElapsedAtVideoMs(ms);
+        const x = (displayMs / total) * 1000;
         cursor.setAttribute('x1', String(x));
         cursor.setAttribute('x2', String(x));
-        curTimeEl.textContent = fmtTime(ms);
+        curTimeEl.textContent = fmtTime(displayMs);
     }
 
     function seekTo(ms) {
@@ -148,6 +153,7 @@
         const result = [];
         const gaps = [];
         let offset = 0;
+        const firstTs = frames.length ? Number(frames[0].ts) : 0;
         for (let i = 0; i < frames.length; i++) {
             const cur = frames[i];
             const next = frames[i + 1];
@@ -158,7 +164,15 @@
                 d = isConnectionGap ? Math.min(realGap, maxGapMs) : realGap;
                 if (isConnectionGap) {
                     const gapStartMs = offset + Math.min(defaultDurationMs, d);
-                    gaps.push({ startMs: gapStartMs, endMs: offset + d, realDurationMs: realGap });
+                    const realStartMs = cur.ts - firstTs + Math.min(defaultDurationMs, d);
+                    const realEndMs = next.ts - firstTs;
+                    gaps.push({
+                        startMs: gapStartMs,
+                        endMs: offset + d,
+                        realStartMs,
+                        realEndMs,
+                        realDurationMs: realGap,
+                    });
                 }
             } else {
                 d = defaultDurationMs;
@@ -167,7 +181,14 @@
             result.push({ id: cur.id, ts: cur.ts, vo: offset, d });
             offset += d;
         }
-        return { totalDurationMs: offset, frames: result, gaps };
+        return {
+            totalDurationMs: offset,
+            realTotalDurationMs: result.length
+                ? result[result.length - 1].ts - firstTs + result[result.length - 1].d
+                : 0,
+            frames: result,
+            gaps,
+        };
     }
 
     function showFrameAt(ms) {
@@ -199,7 +220,7 @@
         // Время от начала экзамена — считаем плавно с учётом видео-времени и реальной растяжки в gap'ах.
         // Если у старого экзамена нет started_at, считаем от первого полученного кадра.
         if (examTimeOverlay) {
-            const elapsed = computeRealElapsed(ms);
+            const elapsed = examElapsedAtVideoMs(ms);
             examTimeOverlay.textContent = fmtExamTime(Math.max(0, elapsed));
         }
 
@@ -214,10 +235,9 @@
      * В gap'ах видео-время сжато до maxGapMs, а реальное продолжает идти —
      * интерполируем линейно от ts начала gap до ts конца gap.
      */
-    function computeRealElapsed(videoMs) {
+    function realTimestampAtVideoMs(videoMs) {
         const frames = timeline.frames;
         if (!frames.length) return 0;
-        const baseTs = cfg.examStartedAt || frames[0].ts;
 
         // Найдём кадр, в котором videoMs.
         let idx = frames.length - 1;
@@ -233,8 +253,37 @@
         // Доля прохождения текущего "слота" в видео.
         const localFrac = cur.d > 0 ? (videoMs - cur.vo) / cur.d : 0;
         // Реальный момент = ts текущего кадра + доля * реальный интервал
-        const realTs = cur.ts + localFrac * realIntervalMs;
-        return realTs - baseTs;
+        return cur.ts + localFrac * realIntervalMs;
+    }
+
+    function recordingElapsedAtVideoMs(videoMs) {
+        const frames = timeline.frames;
+        if (!frames.length) return 0;
+        return realTimestampAtVideoMs(videoMs) - frames[0].ts;
+    }
+
+    function examElapsedAtVideoMs(videoMs) {
+        const frames = timeline.frames;
+        if (!frames.length) return 0;
+        return realTimestampAtVideoMs(videoMs) - (cfg.examStartedAt || frames[0].ts);
+    }
+
+    function displayToVideoMs(displayMs) {
+        const frames = timeline.frames;
+        if (!frames.length) return 0;
+        const targetTs = frames[0].ts + displayMs;
+        let idx = frames.length - 1;
+        for (let i = 0; i < frames.length - 1; i++) {
+            if (targetTs >= frames[i].ts && targetTs < frames[i + 1].ts) {
+                idx = i;
+                break;
+            }
+        }
+        const cur = frames[idx];
+        const next = frames[idx + 1];
+        const realIntervalMs = next ? next.ts - cur.ts : cur.d;
+        const localFrac = realIntervalMs > 0 ? (targetTs - cur.ts) / realIntervalMs : 0;
+        return Math.max(0, Math.min(timeline.totalDurationMs, cur.vo + localFrac * cur.d));
     }
 
     function updateSlideshow() {
@@ -267,7 +316,7 @@
 
         timeline = buildClientTimeline(state.frames);
         durationMs = timeline.totalDurationMs;
-        totalTimeEl.textContent = fmtTime(durationMs);
+        totalTimeEl.textContent = fmtTime(timeline.realTotalDurationMs || durationMs);
         renderTimeline();
         showFrameAt(0);
 
