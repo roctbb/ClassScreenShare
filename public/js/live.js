@@ -24,6 +24,8 @@
     const connected = new Set(); // pids с активным publisher-сокетом
     const lastTs = new Map(); // pid -> ms
     const stale = new Set(); // pids считаются stale прямо сейчас
+    const alerting = new Set(); // pids, по которым ещё звучит неподтверждённая тревога
+    const acknowledged = new Set(); // pids, по которым учитель уже кликнул карточку
 
     // ---------- Roster (right column) ----------
     const rosterList = $('roster-list');
@@ -186,7 +188,7 @@
         }
     }
     function refreshBeeping() {
-        if (stale.size > 0) startBeeping();
+        if (alerting.size > 0) startBeeping();
         else stopBeeping();
     }
 
@@ -194,14 +196,14 @@
         if (!audioArmed) {
             muted = false;
             armAudio().then(() => {
-                if (stale.size > 0) startBeeping();
+                if (alerting.size > 0) startBeeping();
             });
             return;
         }
         muted = !muted;
         updateAudioButton();
         if (muted) stopBeeping();
-        else if (stale.size > 0) startBeeping();
+        else if (alerting.size > 0) startBeeping();
     });
 
     // Клик где угодно в гриде — инициализирует AudioContext (требование браузеров).
@@ -300,7 +302,10 @@
             <div class="screen-status hidden"></div>
         `;
         card.querySelector('.screen-name-text').textContent = name;
-        card.addEventListener('click', () => toggleFullscreen(pid));
+        card.addEventListener('click', () => {
+            acknowledgeParticipantAlert(pid);
+            toggleFullscreen(pid);
+        });
         grid.appendChild(card);
         cards.set(pid, card);
         return card;
@@ -325,6 +330,8 @@
         connected.delete(pid);
         lastTs.delete(pid);
         stale.delete(pid);
+        alerting.delete(pid);
+        acknowledged.delete(pid);
         if (fullscreenPid === pid) fullscreenPid = null;
     }
     function removeEmptyState() {
@@ -361,6 +368,8 @@
             connected.add(pid);
             card.classList.remove('stale', 'disconnected');
             stale.delete(pid);
+            alerting.delete(pid);
+            acknowledged.delete(pid);
             if (status) {
                 status.textContent = '';
                 status.classList.add('hidden');
@@ -368,9 +377,11 @@
             setCardSince(pid, lastTs.get(pid));
             setRosterStatus(pid, 'online');
         } else {
+            const wasProblem = stale.has(pid);
             connected.delete(pid);
             card.classList.add('stale', 'disconnected');
             stale.add(pid);
+            if (!wasProblem && !acknowledged.has(pid)) alerting.add(pid);
             const since = card.querySelector('.screen-since');
             if (since) since.textContent = 'отключился';
             if (status) {
@@ -416,8 +427,10 @@
         const card = cards.get(pid);
         if (!card) return;
         if (isStale) {
+            const wasStale = stale.has(pid);
             card.classList.add('stale');
             stale.add(pid);
+            if (!wasStale && !acknowledged.has(pid)) alerting.add(pid);
             const status = card.querySelector('.screen-status');
             if (status && !card.classList.contains('disconnected')) {
                 status.textContent = 'Нет новых кадров';
@@ -431,6 +444,8 @@
         } else {
             card.classList.remove('stale');
             stale.delete(pid);
+            alerting.delete(pid);
+            acknowledged.delete(pid);
             const status = card.querySelector('.screen-status');
             if (status && !card.classList.contains('disconnected')) {
                 status.textContent = '';
@@ -442,6 +457,14 @@
         refreshProblemCounts();
         refreshBeeping();
         applyCardFilter();
+    }
+
+    function acknowledgeParticipantAlert(pid) {
+        pid = Number(pid);
+        if (!stale.has(pid) && !alerting.has(pid)) return;
+        acknowledged.add(pid);
+        alerting.delete(pid);
+        refreshBeeping();
     }
 
     function toggleFullscreen(pid) {
@@ -535,7 +558,10 @@
                 '';
             card.dataset.name = name;
             ensureCardChrome(card);
-            card.addEventListener('click', () => toggleFullscreen(pid));
+            card.addEventListener('click', () => {
+                acknowledgeParticipantAlert(pid);
+                toggleFullscreen(pid);
+            });
             cards.set(pid, card);
             connected.add(pid);
         });
